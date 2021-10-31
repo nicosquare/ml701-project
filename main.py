@@ -33,7 +33,7 @@ class MLPIndividual(Individual):
 
 
 def generation(gen_env, old_population, new_population, p_mutation, p_crossover, p_inversion=None):
-    for i in range(0, len(old_population) - 1, 2):
+    for i in range(0, len(old_population) - 1, 2): # Should we keep this?
         # Selection
         parent1 = roulette_wheel_selection(old_population)
         parent2 = roulette_wheel_selection(old_population)
