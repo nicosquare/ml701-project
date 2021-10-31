@@ -10,7 +10,7 @@ from ga.population import Population
 from network.base_nn import NeuralNetwork
 from network.mlp import MLPTorch
 
-
+# author: Nicolas
 class MLPIndividual(Individual):
 
     def get_model(self, input_size, hidden_size, output_size) -> NeuralNetwork:
