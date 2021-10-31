@@ -18,7 +18,7 @@ class MLPTorch(nn.Module, NeuralNetwork):
     def forward(self, x) -> torch.Tensor:
         output = torch.relu(self.linear1(x))
         output = self.dropout(output)
-        output = torch.tanh(self.linear2(output))
+        output = torch.relu(self.linear2(output))
         return output
 
     def get_weights_biases(self) -> np.array:

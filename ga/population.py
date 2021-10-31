@@ -42,8 +42,6 @@ class Population:
                            self.p_crossover,
                            self.p_inversion)
 
-            print(self.new_population)
-
             if log:
                 self.save_logs(i, output_folder)
 
