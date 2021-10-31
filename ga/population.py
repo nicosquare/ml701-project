@@ -29,7 +29,7 @@ class Population:
 
         for i in range(self.max_generation):
 
-            print("Generation {}", i)
+            print("Generation {}.format(i))
             print("Start: Calculate sequentially")
             [p.calculate_fitness(env) for p in self.old_population]
             print("End: Calculate sequentially")

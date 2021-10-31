@@ -68,7 +68,7 @@ def mutation(parent_weights_biases: np.array, p: float, scale=10):
     child_weight_biases = np.copy(parent_weights_biases)
     if np.random.rand() < p:
         position = np.random.randint(0, parent_weights_biases.shape[0])
-        n = np.random.normal(np.mean(child_weight_biases), np.std(child_weight_biases))
+        n = np.random.normal(np.mean(child_weight_biases), np.std(child_weight_biases)) # Why is it good to use a Normal dist?
         child_weight_biases[position] = n + np.random.randint(-scale, scale)
     return child_weight_biases
 
