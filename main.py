@@ -76,8 +76,8 @@ def generation(gen_env, old_population, new_population, p_mutation, p_crossover,
 if __name__ == '__main__':
     env = gym.make('ChromeDinoGA-v0')
 
-    POPULATION_SIZE = 100  # This value should be pair
-    MAX_GENERATION = 20
+    POPULATION_SIZE = 10  # This value should be pair
+    MAX_GENERATION = 5000
     MUTATION_RATE = 0.1
     CROSSOVER_RATE = 0.8
 
