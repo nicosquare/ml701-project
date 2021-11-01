@@ -17,10 +17,15 @@ class MLPTorch(nn.Module, NeuralNetwork):
         self.linear2 = nn.Linear(hidden_size, output_size)
 
     def forward(self, x) -> torch.Tensor:
-        output = torch.relu(self.linear1(x))
-        # output = self.dropout(output)
-        output = self.sigmoid(output)
-        output = torch.relu(self.linear2(output))
+        # print('1. ',x)
+        output = self.linear1(x)
+        # print('2. ',output)
+        output = torch.sigmoid(output)
+        # print('3. ', output)
+        output = self.linear2(output)
+        # print('4. ', output)
+        output = torch.sigmoid(output)
+        # print('5. ', output)
         return output
 
     def get_weights_biases(self) -> np.array:
