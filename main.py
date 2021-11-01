@@ -25,8 +25,10 @@ class MLPIndividual(Individual):
                 ind_env.render()
             obs = torch.from_numpy(obs).float()
             action = self.nn.forward(obs)
+            # print('Do: {}'.format(action))
             obs, reward, done, _ = ind_env.step(torch.argmax(action))
-            fitness += reward
+            # fitness += reward
+            fitness = reward
             if done:
                 break
         return fitness, self.nn.get_weights_biases()
@@ -76,8 +78,8 @@ def generation(gen_env, old_population, new_population, p_mutation, p_crossover,
 if __name__ == '__main__':
     env = gym.make('ChromeDinoGA-v0')
 
-    POPULATION_SIZE = 10  # This value should be pair
-    MAX_GENERATION = 5000
+    POPULATION_SIZE = 4  # This value should be pair
+    MAX_GENERATION = 50000
     MUTATION_RATE = 0.1
     CROSSOVER_RATE = 0.8
 
