@@ -4,6 +4,7 @@ import torch
 import gym_chrome_dino
 from typing import Tuple
 import numpy as np
+import argparse
 
 from ga.individual import roulette_wheel_selection, crossover, mutation, Individual
 from ga.population import Population
@@ -74,12 +75,20 @@ def generation(gen_env, old_population, new_population, p_mutation, p_crossover,
 """
     Main method definition
 """
+parser = argparse.ArgumentParser()
+
+# Adding optional argument
+parser.add_argument("-p", "--Population", help="key in number of population.")
+parser.add_argument("-g", "--Generation", help="key in max number of generation")
+
+# Read arguments from command line
+args = parser.parse_args()
 
 if __name__ == '__main__':
     env = gym.make('ChromeDinoGA-v0')
 
-    POPULATION_SIZE = 4  # This value should be pair
-    MAX_GENERATION = 50000
+    POPULATION_SIZE = args.Population if args.Population else 4  # This value should be pair
+    MAX_GENERATION = args.Generation if args.Generation else 10000
     MUTATION_RATE = 0.1
     CROSSOVER_RATE = 0.8
 
