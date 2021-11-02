@@ -12,6 +12,7 @@ from ga.population import Population
 from network.base_nn import NeuralNetwork
 from network.mlp import MLPTorch
 
+
 # author: Nicolas
 class MLPIndividual(Individual):
 
@@ -23,27 +24,38 @@ class MLPIndividual(Individual):
         done = False
         fitness = 0
         while not done:
+
             if render:
                 ind_env.render()
             obs = torch.from_numpy(obs).float()
+
             '''
-            # do mean normalization
-            obstacle_x_distance = > [-20, 600]
-            obstacle_y_distance = > [-20, 150]
-            dino_position_x = > [0, 600]
-            dino_position_y = > [0, 150]
-            next_obstacle_width = > [0, 200]
-            next_obstacle_height = > [0, 100]
-            speed = > [0, 100]
+            # Do mean normalization
+            
+            dino_position_x => [0, 600]
+            dino_position_y => [0, 150]
+            1st_obstacle_x_distance => [-20, 600]
+            1st_obstacle_y_distance => [-20, 150]
+            1st_obstacle_width => [0, 200]
+            1st_obstacle_height => [0, 100]
+            2nd_obstacle_x_distance => [-20, 600]
+            2nd_obstacle_y_distance => [-20, 150]
+            2nd_obstacle_width => [0, 200]
+            2nd_obstacle_height => [0, 100]
+            speed => [0, 100]
+            
             '''
-            obs[0] = obs[0] / mean([-20, 600])
-            obs[1] = obs[1] / mean([-20, 150])
-            obs[2] = obs[2] / mean([0, 600])
-            obs[3] = obs[3] / mean([0, 150])
+            obs[0] = obs[0] / mean([0, 600])
+            obs[1] = obs[1] / mean([0, 150])
+            obs[2] = obs[2] / mean([-20, 600])
+            obs[3] = obs[3] / mean([-20, 150])
             obs[4] = obs[4] / mean([0, 200])
             obs[5] = obs[5] / mean([0, 100])
-            obs[6] = obs[6] / mean([0, 100])
-
+            obs[6] = obs[6] / mean([-20, 600])
+            obs[7] = obs[7] / mean([-20, 150])
+            obs[8] = obs[8] / mean([0, 200])
+            obs[9] = obs[9] / mean([0, 100])
+            obs[10] = obs[10] / mean([0, 100])
 
             # print('here: ', obs)
             action = self.nn.forward(obs)
@@ -57,7 +69,7 @@ class MLPIndividual(Individual):
 
 
 def generation(gen_env, old_population, new_population, p_mutation, p_crossover, p_inversion=None):
-    for i in range(0, len(old_population) - 1, 2): # Should we keep this?
+    for i in range(0, len(old_population) - 1, 2):  # Should we keep this?
         # Selection
         parent1 = roulette_wheel_selection(old_population)
         parent2 = roulette_wheel_selection(old_population)
@@ -108,14 +120,15 @@ args = parser.parse_args()
 if __name__ == '__main__':
     env = gym.make('ChromeDinoGA-v0')
 
+    env.set_score_mode('normal')
+
     POPULATION_SIZE = args.Population if args.Population else 30  # This value should be pair
     MAX_GENERATION = args.Generation if args.Generation else 10
     MUTATION_RATE = 0.1
     CROSSOVER_RATE = 0.8
 
-    # p = Population(MLPIndividual(7, 10, 3), POPULATION_SIZE, MAX_GENERATION, MUTATION_RATE, CROSSOVER_RATE, None)
-    p = Population(lambda: MLPIndividual(7, 10, 3), POPULATION_SIZE, MAX_GENERATION, MUTATION_RATE, CROSSOVER_RATE,
-                   None)
+    p = Population(lambda: MLPIndividual(len(env.reset()), 10, 3), POPULATION_SIZE, MAX_GENERATION,
+                   MUTATION_RATE, CROSSOVER_RATE, None)
     p.run(env, generation, verbose=True, output_folder='./models/ga_dino', log=True)
 
     env.close()
