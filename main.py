@@ -5,6 +5,7 @@ import gym_chrome_dino
 from typing import Tuple
 import numpy as np
 import argparse
+from statistics import mean
 
 from ga.individual import roulette_wheel_selection, crossover, mutation, Individual
 from ga.population import Population
@@ -25,6 +26,26 @@ class MLPIndividual(Individual):
             if render:
                 ind_env.render()
             obs = torch.from_numpy(obs).float()
+            '''
+            # do mean normalization
+            obstacle_x_distance = > [-20, 600]
+            obstacle_y_distance = > [-20, 150]
+            dino_position_x = > [0, 600]
+            dino_position_y = > [0, 150]
+            next_obstacle_width = > [0, 200]
+            next_obstacle_height = > [0, 100]
+            speed = > [0, 100]
+            '''
+            obs[0] = obs[0] / mean([-20, 600])
+            obs[1] = obs[1] / mean([-20, 150])
+            obs[2] = obs[2] / mean([0, 600])
+            obs[3] = obs[3] / mean([0, 150])
+            obs[4] = obs[4] / mean([0, 200])
+            obs[5] = obs[5] / mean([0, 100])
+            obs[6] = obs[6] / mean([0, 100])
+
+
+            # print('here: ', obs)
             action = self.nn.forward(obs)
             # print('Do: {}'.format(action))
             obs, reward, done, _ = ind_env.step(torch.argmax(action))
@@ -87,7 +108,7 @@ args = parser.parse_args()
 if __name__ == '__main__':
     env = gym.make('ChromeDinoGA-v0')
 
-    POPULATION_SIZE = args.Population if args.Population else 4  # This value should be pair
+    POPULATION_SIZE = args.Population if args.Population else 10  # This value should be pair
     MAX_GENERATION = args.Generation if args.Generation else 10000
     MUTATION_RATE = 0.1
     CROSSOVER_RATE = 0.8
