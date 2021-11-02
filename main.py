@@ -108,12 +108,14 @@ args = parser.parse_args()
 if __name__ == '__main__':
     env = gym.make('ChromeDinoGA-v0')
 
-    POPULATION_SIZE = args.Population if args.Population else 10  # This value should be pair
-    MAX_GENERATION = args.Generation if args.Generation else 10000
+    POPULATION_SIZE = args.Population if args.Population else 30  # This value should be pair
+    MAX_GENERATION = args.Generation if args.Generation else 10
     MUTATION_RATE = 0.1
     CROSSOVER_RATE = 0.8
 
-    p = Population(MLPIndividual(7, 10, 3), POPULATION_SIZE, MAX_GENERATION, MUTATION_RATE, CROSSOVER_RATE, None)
+    # p = Population(MLPIndividual(7, 10, 3), POPULATION_SIZE, MAX_GENERATION, MUTATION_RATE, CROSSOVER_RATE, None)
+    p = Population(lambda: MLPIndividual(7, 10, 3), POPULATION_SIZE, MAX_GENERATION, MUTATION_RATE, CROSSOVER_RATE,
+                   None)
     p.run(env, generation, verbose=True, output_folder='./models/ga_dino', log=True)
 
     env.close()

@@ -16,7 +16,8 @@ class Population:
         self.p_mutation = p_mutation
         self.p_crossover = p_crossover
         self.p_inversion = p_inversion
-        self.old_population = [copy.copy(individual) for _ in range(pop_size)]
+        # self.old_population = [copy.copy(individual) for _ in range(pop_size)]  # if copy, all weights will be the same
+        self.old_population = [individual() for _ in range(pop_size)]
         self.new_population = []
 
     def set_population(self, population: list):
@@ -31,7 +32,11 @@ class Population:
 
             print("Generation {}".format(i))
             print("Start: Calculate sequentially")
-            [p.calculate_fitness(env) for p in self.old_population]
+            for j in range(len(self.old_population)):
+                print(f'Calculating {j}')
+                p = self.old_population[j]
+                p.calculate_fitness(env)
+
             print("End: Calculate sequentially")
 
             self.new_population = [None for _ in range(self.pop_size)]
