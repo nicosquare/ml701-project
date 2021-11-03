@@ -5,7 +5,6 @@ import gym_chrome_dino
 from typing import Tuple
 import numpy as np
 import argparse
-from statistics import mean
 
 from ga.individual import roulette_wheel_selection, crossover, mutation, Individual
 from ga.population import Population
@@ -29,39 +28,9 @@ class MLPIndividual(Individual):
                 ind_env.render()
             obs = torch.from_numpy(obs).float()
 
-            '''
-            # Do mean normalization
-            
-            dino_position_x => [0, 600]
-            dino_position_y => [0, 150]
-            1st_obstacle_x_distance => [-20, 600]
-            1st_obstacle_y_distance => [-20, 150]
-            1st_obstacle_width => [0, 200]
-            1st_obstacle_height => [0, 100]
-            2nd_obstacle_x_distance => [-20, 600]
-            2nd_obstacle_y_distance => [-20, 150]
-            2nd_obstacle_width => [0, 200]
-            2nd_obstacle_height => [0, 100]
-            speed => [0, 100]
-            
-            '''
-            obs[0] = obs[0] / mean([0, 600])
-            obs[1] = obs[1] / mean([0, 150])
-            obs[2] = obs[2] / mean([-20, 600])
-            obs[3] = obs[3] / mean([-20, 150])
-            obs[4] = obs[4] / mean([0, 200])
-            obs[5] = obs[5] / mean([0, 100])
-            obs[6] = obs[6] / mean([-20, 600])
-            obs[7] = obs[7] / mean([-20, 150])
-            obs[8] = obs[8] / mean([0, 200])
-            obs[9] = obs[9] / mean([0, 100])
-            obs[10] = obs[10] / mean([0, 100])
-
-            # print('here: ', obs)
             action = self.nn.forward(obs)
-            # print('Do: {}'.format(action))
             obs, reward, done, _ = ind_env.step(torch.argmax(action))
-            # fitness += reward
+
             fitness = reward
             if done:
                 break
@@ -115,12 +84,21 @@ parser.add_argument("-p", "--Population", help="key in number of population.")
 parser.add_argument("-g", "--Generation", help="key in max number of generation")
 parser.add_argument("-m", "--Mutation", help="key in mutation rate")
 parser.add_argument("-c", "--Crossover", help="key in crossover rate")
+parser.add_argument("-o", "--Obstacle", help="number of obstacles to include")
 
 # Read arguments from command line
 args = parser.parse_args()
 
 if __name__ == '__main__':
-    env = gym.make('ChromeDinoGA-v0')
+
+    print(args.Obstacle)
+
+    if args.Obstacle is None or int(args.Obstacle) == 1:
+        env = gym.make('ChromeDinoGAOneObstacle-v0')
+    elif int(args.Obstacle) == 2:
+        env = gym.make('ChromeDinoGATwoObstacle-v0')
+    else:
+        raise Exception('Just 1 or 2 obstacles are supported')
 
     env.set_score_mode('normal')
 

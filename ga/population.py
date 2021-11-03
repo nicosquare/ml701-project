@@ -73,7 +73,7 @@ class Population:
         file_name = 'logs.csv'
         mean, t_min, t_max = statistics(self.new_population)
         stats = f'{date},{n_gen},{mean},{t_min},{t_max}\n'
-        with open(output_folder + file_name, 'a') as f:
+        with open(output_folder + self.get_file_name(self.now()) + file_name, 'a') as f:
             f.write(stats)
 
     def show_stats(self, n_gen):
