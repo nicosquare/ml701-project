@@ -113,6 +113,8 @@ parser = argparse.ArgumentParser()
 # Adding optional argument
 parser.add_argument("-p", "--Population", help="key in number of population.")
 parser.add_argument("-g", "--Generation", help="key in max number of generation")
+parser.add_argument("-m", "--Mutation", help="key in mutation rate")
+parser.add_argument("-c", "--Crossover", help="key in crossover rate")
 
 # Read arguments from command line
 args = parser.parse_args()
@@ -122,10 +124,10 @@ if __name__ == '__main__':
 
     env.set_score_mode('normal')
 
-    POPULATION_SIZE = args.Population if args.Population else 30  # This value should be pair
-    MAX_GENERATION = args.Generation if args.Generation else 10
-    MUTATION_RATE = 0.1
-    CROSSOVER_RATE = 0.8
+    POPULATION_SIZE = int(args.Population) if args.Population else 30  # This value should be pair
+    MAX_GENERATION = int(args.Generation) if args.Generation else 10
+    MUTATION_RATE = float(args.Mutation) if args.Mutation else 0.1
+    CROSSOVER_RATE = float(args.Crossover) if args.Crossover else 0.8
 
     p = Population(lambda: MLPIndividual(len(env.reset()), 10, 3), POPULATION_SIZE, MAX_GENERATION,
                    MUTATION_RATE, CROSSOVER_RATE, None)
