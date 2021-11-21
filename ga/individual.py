@@ -11,6 +11,7 @@ class Individual(ABC):
         self.nn = self.get_model(input_size, hidden_size, output_size)
         self.fitness = 0.0
         self.weights_biases: np.array = None
+        self.input_size = input_size
 
     def calculate_fitness(self, env) -> None:
         self.fitness, self.weights_biases = self.run_single(env)

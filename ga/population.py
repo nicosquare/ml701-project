@@ -101,12 +101,13 @@ class Population:
         return sorted(self.new_population, key=lambda ind: ind.fitness, reverse=True)[0]
 
     def get_file_name(self, date):
-        return '{}_NN={}_POPSIZE={}_GEN={}_PMUTATION_{}_PCROSSOVER_{}'.format(date,
+        return '{}_NN={}_POPSIZE={}_GEN={}_PMUTATION_{}_PCROSSOVER_{}_OBSTACLES_{}'.format(date,
                                                                               self.new_population[0].__class__.__name__,
                                                                               self.pop_size,
                                                                               self.max_generation,
                                                                               self.p_mutation,
-                                                                              self.p_crossover)
+                                                                              self.p_crossover,
+                                                                              self.new_population[0].input_size)
 
     @staticmethod
     def now():
