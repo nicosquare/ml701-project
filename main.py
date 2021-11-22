@@ -91,8 +91,6 @@ args = parser.parse_args()
 
 if __name__ == '__main__':
 
-    print(args.Obstacle)
-
     if args.Obstacle is None or int(args.Obstacle) == 1:
         env = gym.make('ChromeDinoGAOneObstacle-v0')
     elif int(args.Obstacle) == 2:

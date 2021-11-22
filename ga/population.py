@@ -73,7 +73,7 @@ class Population:
         file_name = 'logs.csv'
         mean, t_min, t_max = statistics(self.new_population)
         stats = f'{date},{n_gen},{mean},{t_min},{t_max}\n'
-        with open(output_folder + self.get_file_name(self.now()) + file_name, 'a') as f:
+        with open(output_folder + self.get_file_name_without_date() + file_name, 'a') as f:
             f.write(stats)
 
     def show_stats(self, n_gen):
@@ -101,13 +101,27 @@ class Population:
         return sorted(self.new_population, key=lambda ind: ind.fitness, reverse=True)[0]
 
     def get_file_name(self, date):
-        return '{}_NN={}_POPSIZE={}_GEN={}_PMUTATION_{}_PCROSSOVER_{}_OBSTACLES_{}'.format(date,
-                                                                              self.new_population[0].__class__.__name__,
-                                                                              self.pop_size,
-                                                                              self.max_generation,
-                                                                              self.p_mutation,
-                                                                              self.p_crossover,
-                                                                              self.new_population[0].input_size)
+        return '{}_NN={}_POPSIZE={}_GEN={}_PMUTATION_{}_PCROSSOVER_{}_OBSTACLES_{}'.format(
+            date,
+            self.new_population[
+                0].__class__.__name__,
+            self.pop_size,
+            self.max_generation,
+            self.p_mutation,
+            self.p_crossover,
+            self.new_population[
+                0].input_size
+        )
+
+    def get_file_name_without_date(self):
+        return 'NN={}_POPSIZE={}_GEN={}_PMUTATION_{}_PCROSSOVER_{}_OBSTACLES_{}'.format(
+            self.new_population[0].__class__.__name__,
+            self.pop_size,
+            self.max_generation,
+            self.p_mutation,
+            self.p_crossover,
+            self.new_population[0].input_size
+        )
 
     @staticmethod
     def now():
