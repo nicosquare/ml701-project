@@ -85,6 +85,7 @@ parser.add_argument("-g", "--Generation", help="key in max number of generation"
 parser.add_argument("-m", "--Mutation", help="key in mutation rate")
 parser.add_argument("-c", "--Crossover", help="key in crossover rate")
 parser.add_argument("-o", "--Obstacle", help="number of obstacles to include")
+parser.add_argument("-n", "--NoBrowser", help="run without UI", action='store_true')
 
 # Read arguments from command line
 args = parser.parse_args()
@@ -92,9 +93,16 @@ args = parser.parse_args()
 if __name__ == '__main__':
 
     if args.Obstacle is None or int(args.Obstacle) == 1:
-        env = gym.make('ChromeDinoGAOneObstacle-v0')
+        if not args.NoBrowser:
+            env = gym.make('ChromeDinoGAOneObstacle-v0')
+        else:
+            env = gym.make('ChromeDinoGAOneObstacleNoBrowser-v0')
     elif int(args.Obstacle) == 2:
-        env = gym.make('ChromeDinoGATwoObstacle-v0')
+        if not args.NoBrowser:
+            env = gym.make('ChromeDinoGATwoObstacle-v0')
+        else:
+            env = gym.make('ChromeDinoGATwoObstacleNoBrowser-v0')
+
     else:
         raise Exception('Just 1 or 2 obstacles are supported')
 

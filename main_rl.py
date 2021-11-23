@@ -9,7 +9,7 @@ from utils.show_img import show_img
 class GameSession:
 
     def __init__(
-        self, session_env, n_episodes = 100
+            self, session_env, n_episodes=100
     ):
 
         self.session_env = session_env
@@ -40,7 +40,6 @@ class GameSession:
     def run_complete_game(self):
 
         for episode in range(self.n_episodes):
-
             self.run_episode()
 
 
@@ -54,4 +53,13 @@ args = parser.parse_args()
 
 if __name__ == '__main__':
 
-    env = gym.make('ChromeDino-v0')
+    env = gym.make('ChromeDinoNoBrowser-v0')
+
+    done = False
+
+    while not done:
+
+        obs, reward, done, info = env.step(np.random.randint(0, 2))
+        print(obs)
+
+    env.close()

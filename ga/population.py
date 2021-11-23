@@ -101,7 +101,7 @@ class Population:
         return sorted(self.new_population, key=lambda ind: ind.fitness, reverse=True)[0]
 
     def get_file_name(self, date):
-        return '{}_NN={}_POPSIZE={}_GEN={}_PMUTATION_{}_PCROSSOVER_{}_OBSTACLES_{}'.format(
+        return '{}_NN={}_POPSIZE={}_GEN={}_PMUTATION_{}_PCROSSOVER_{}_INPUTS_{}'.format(
             date,
             self.new_population[
                 0].__class__.__name__,
@@ -114,7 +114,7 @@ class Population:
         )
 
     def get_file_name_without_date(self):
-        return 'NN={}_POPSIZE={}_GEN={}_PMUTATION_{}_PCROSSOVER_{}_OBSTACLES_{}'.format(
+        return 'NN={}_POPSIZE={}_GEN={}_PMUTATION_{}_PCROSSOVER_{}_INPUTS_{}'.format(
             self.new_population[0].__class__.__name__,
             self.pop_size,
             self.max_generation,
