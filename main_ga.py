@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import gym
 import copy
 import torch
@@ -74,6 +76,10 @@ def generation(gen_env, old_population, new_population, p_mutation, p_crossover,
             new_population[i + 1] = parent2
 
 
+def create_required_folders():
+    Path("models/ga").mkdir(parents=True, exist_ok=True)
+
+
 """
     Main method definition
 """
@@ -91,6 +97,9 @@ parser.add_argument("-n", "--NoBrowser", help="run without UI", action='store_tr
 args = parser.parse_args()
 
 if __name__ == '__main__':
+
+    # Guarantee the creation of required folders
+    create_required_folders()
 
     if args.Obstacle is None or int(args.Obstacle) == 1:
         if not args.NoBrowser:
@@ -115,6 +124,6 @@ if __name__ == '__main__':
 
     p = Population(lambda: MLPIndividual(len(env.reset()), 10, 3), POPULATION_SIZE, MAX_GENERATION,
                    MUTATION_RATE, CROSSOVER_RATE, None)
-    p.run(env, generation, verbose=True, output_folder='./models/ga_dino', log=True)
+    p.run(env, generation, verbose=True, output_folder='./models/ga/dino', log=True)
 
     env.close()
