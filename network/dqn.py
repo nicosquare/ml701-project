@@ -1,7 +1,7 @@
-from builtins import object
+import os
+
 from collections import OrderedDict
 
-import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn import Sequential, Conv2d, MaxPool2d, ReLU, Flatten, Linear, MSELoss
@@ -42,42 +42,41 @@ class DQN(nn.Module):
         self.criterion = MSELoss()
         self.model.to(self.device)
 
-        self.save_model()
+        # create model file if not present
+        if not os.path.isfile(self.model_path):
+            self.save_model()
 
     def print_model(self):
         summary(model=self.model, input_size=(1, 4, 80, 80))
 
     def predict(self, state):
-
-        state.to(self.device)
-
         return self.model(state.float().to(self.device))
 
     def train_on_batch(self, batch, gamma):
 
-        train_loss = 0
-        q_sa = None
+        target_q_values = torch.tensor([])
+        s_t1_q_values = torch.tensor([])
 
         for s_t, a_t, r_t, s_t1, done in batch:
 
             target = self.predict(s_t)  # Predicted Q values
             q_s_t1 = self.predict(s_t1)  # Predicted Q values for the next state
-            q_sa = q_s_t1
 
             if done:
                 target[:, a_t] = r_t  # If terminated, only equals to reward
             else:
                 target[:, a_t] = r_t + gamma * torch.max(q_s_t1)
 
-            loss = self.criterion(target, q_s_t1)
+            target_q_values = torch.cat((target_q_values, target), dim=0)
+            s_t1_q_values = torch.cat((s_t1_q_values, q_s_t1), dim=0)
 
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+        loss = self.criterion(target_q_values, s_t1_q_values)
 
-            train_loss += loss.item()
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
 
-        return (train_loss / len(batch)), torch.max(q_sa).item()  # Return normalized loss and max Q values
+        return loss.item()
 
     def save_model(self):
 
@@ -98,4 +97,5 @@ class DQN(nn.Module):
             self.model.train()
         else:
             print('Loading model for inference')
+            self.model.load_state_dict(state['state_dict'])
             self.model.eval()

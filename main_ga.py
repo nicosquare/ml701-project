@@ -1,3 +1,4 @@
+import traceback
 from pathlib import Path
 
 import gym
@@ -124,6 +125,10 @@ if __name__ == '__main__':
 
     p = Population(lambda: MLPIndividual(len(env.reset()), 10, 3), POPULATION_SIZE, MAX_GENERATION,
                    MUTATION_RATE, CROSSOVER_RATE, None)
-    p.run(env, generation, verbose=True, output_folder='./models/ga/dino', log=True)
 
-    env.close()
+    try:
+        p.run(env, generation, verbose=True, output_folder='./models/ga/dino', log=True)
+    except Exception as e:
+        print('Closing environment due to exception')
+        env.close()
+        raise e
