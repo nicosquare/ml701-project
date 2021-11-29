@@ -39,9 +39,14 @@ class GameSession:
         self.n_actions = n_actions
         self.gamma = gamma
         self.steps_to_save = steps_to_save
-        self.loss_path = loss_path
-        self.scores_path = scores_path
-        self.actions_path = actions_path
+        self.loss_path = './models/rl/loss_epsilon_i_{}_epsilon_f_{}_batch_{}.csv'\
+            .format(initial_epsilon, final_epsilon, minibatch_size)
+        self.scores_path = './models/rl/scores_epsilon_i_{}_epsilon_f_{}_batch_{}.csv'\
+            .format(initial_epsilon, final_epsilon, minibatch_size)
+        self.actions_path = './models/rl/actions_epsilon_i_{}_epsilon_f_{}_batch_{}.csv'\
+            .format(initial_epsilon, final_epsilon, minibatch_size)
+        self.model_path = './models/rl/model_epsilon_i_{}_epsilon_f_{}_batch_{}.pt'\
+            .format(initial_epsilon, final_epsilon, minibatch_size)
 
         # Display the processed image on screen using openCV, implemented using python coroutine
         self._display = show_img()
@@ -62,7 +67,7 @@ class GameSession:
 
     def run_complete_game(self):
 
-        model = DQN()
+        model = DQN(model_path=self.model_path)
         last_time = time()
         replay_memory = self.load_obj('replay_memory')
         self.session_env.reset()
