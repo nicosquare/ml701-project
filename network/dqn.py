@@ -51,7 +51,7 @@ class DQN(nn.Module):
 
         state.to(self.device)
 
-        return self.model(state.float())
+        return self.model(state.float().to(self.device))
 
     def train_on_batch(self, batch, gamma):
 
