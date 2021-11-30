@@ -14,6 +14,7 @@ from time import time
 import matplotlib
 import matplotlib.pyplot as plt
 from torch import optim
+import csv
 
 from network.mlp_pg import MLPTorch
 
@@ -54,7 +55,8 @@ class GameSession:
         rewardHistory = []
         entropyHistory = []
         loss = []
-
+        save_iteration = 2
+        file_path = './models/rl_pl/reward_history.csv'
         self.session_env.reset()
 
         s_t, r_t, done, _ = self.session_env.step(0)
@@ -66,12 +68,12 @@ class GameSession:
         for i in range(no_iterations):
             print('iteration: ', i)
             log_probs, rewards, entropy = self.run_complete_game(model, s_t)
-            print(log_probs)
-            print(rewards)
+            # print(log_probs)
+            # print(rewards)
             total_rewards = np.sum(rewards)
             model_loss = torch.sum(torch.stack(log_probs, 0), 0) * torch.tensor(total_rewards)
             model_loss = -torch.mean(model_loss)
-            print(model_loss)
+            # print(model_loss)
             loss.append(float(model_loss))
             rewardHistory.append(total_rewards)
             entropyHistory.append(entropy)
@@ -79,9 +81,31 @@ class GameSession:
             model_loss.backward()
             model_optim.step()
 
-        plt.plot(rewardHistory)
+            print(rewardHistory)
+            if (no_iterations % save_iteration == 0):
+                # open the file in the write mode
+
+                mode = 'a' if os.path.exists(file_path) else 'w+'
+
+                f = open(file_path, mode, newline='')
+
+                # create the csv writer
+                writer = csv.writer(f)
+
+                # write a row to the csv file
+                # for re in rewardHistory:
+                writer.writerow(rewardHistory)
+
+                # close the file
+                f.close()
+                print('Done writing into file. Clear Reward History...')
+                rewardHistory = []
+
+
+
+        # plt.plot(rewardHistory)
         # plt.plot(loss)
-        print(np.max(rewardHistory))
+        # print(np.max(rewardHistory))
 
         plt.show()
 
@@ -132,27 +156,21 @@ class GameSession:
 
         return log_probs, rewards, entropies
 
-
+def create_required_folders():
+    Path("models/rl_pl").mkdir(parents=True, exist_ok=True)
 
 
 
 """
     Main method definition
 """
-parser = argparse.ArgumentParser()
-
-parser.add_argument("-i", "--InitialEpsilon", help="Initial epsilon")
-parser.add_argument("-f", "--FinalEpsilon", help="Final epsilon")
-parser.add_argument("-s", "--StepsToSave", help="Steps to save")
-parser.add_argument("-o", "--Observe", help="If used, no training is done, just playing", action='store_true')
-parser.add_argument("-n", "--NoBrowser", help="Run without UI", action='store_true')
 
 # Read arguments from command line
-args = parser.parse_args()
 
 if __name__ == '__main__':
 
     # Guarantee the creation of required folders
+    create_required_folders()
 
     if __name__ == '__main__':
 
