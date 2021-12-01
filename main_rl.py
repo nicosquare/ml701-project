@@ -21,7 +21,7 @@ class GameSession:
 
     def __init__(
             self, session_env, initial_epsilon=0.1, final_epsilon=0.0001, observe=False,
-            steps_to_observe=100, frames_to_action=1, frames_to_anneal=100000, replay_memory_size=5000,
+            steps_to_observe=100, frames_to_action=1, frames_to_anneal=1000000, replay_memory_size=5000,
             minibatch_size=16, n_actions=3, gamma=0.99, steps_to_save=1000,
             loss_path='./models/rl/loss.csv', scores_path='./models/rl/scores.csv',
             actions_path='./models/rl/actions.csv',
@@ -79,7 +79,7 @@ class GameSession:
         s_t = torch.stack((x_t, x_t, x_t, x_t))
         s_t = torch.reshape(s_t, (1, s_t.shape[0], s_t.shape[1], s_t.shape[2]))
 
-        model.build_model(n_stacked_frames=s_t.shape[1], n_actions=self.n_actions, learning_rate=1e-3)
+        model.build_model(n_stacked_frames=s_t.shape[1], n_actions=self.n_actions, learning_rate=3e-3)
 
         # Save initial state for resetting the terminal state
         initial_state = s_t
@@ -204,27 +204,39 @@ class GameSession:
             self.create_cache_file('replay_memory')
             self.save_obj(deque(), "replay_memory")
 
-    @staticmethod
-    def save_obj(obj, name):
-        with open('models/rl/' + name + '.pkl', 'wb') as f:
+    def save_obj(self, obj, name):
+
+        file_name = 'models/rl/' + name + '_i_{}_epsilon_f_{}_batch_{}.pkl'\
+            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size)
+
+        with open(file_name, 'wb') as f:
             pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
-    @staticmethod
-    def load_obj(name):
+    def load_obj(self, name):
+
+        file_name = 'models/rl/' + name + '_i_{}_epsilon_f_{}_batch_{}.pkl' \
+            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size)
+
         try:
-            with open('models/rl/' + name + '.pkl', 'rb') as f:
+            with open(file_name, 'rb') as f:
                 return pickle.load(f)
-        except FileNotFoundError as e:
-            raise e
+        except FileNotFoundError as exc:
+            raise exc
 
-    @staticmethod
-    def cache_file_exists(name):
-        return os.path.exists('models/rl/' + name + '.pkl')
+    def cache_file_exists(self, name):
 
-    @staticmethod
-    def create_cache_file(name):
-        print('Creating {}.pkl file'.format(name))
-        open('models/rl/' + name + '.pkl', 'w+').close()
+        file_name = 'models/rl/' + name + '_i_{}_epsilon_f_{}_batch_{}.pkl' \
+            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size)
+
+        return os.path.exists(file_name)
+
+    def create_cache_file(self, name):
+
+        file_name = 'models/rl/' + name + '_i_{}_epsilon_f_{}_batch_{}.pkl' \
+            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size)
+
+        print('Creating {} file'.format(file_name))
+        open(file_name, 'w+').close()
 
 
 def create_required_folders():
@@ -239,6 +251,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--InitialEpsilon", help="Initial epsilon")
 parser.add_argument("-f", "--FinalEpsilon", help="Final epsilon")
 parser.add_argument("-s", "--StepsToSave", help="Steps to save")
+parser.add_argument("-m", "--MiniBatch", help="Mini batch size")
 parser.add_argument("-o", "--Observe", help="If used, no training is done, just playing", action='store_true')
 parser.add_argument("-n", "--NoBrowser", help="Run without UI", action='store_true')
 
@@ -257,12 +270,13 @@ if __name__ == '__main__':
 
     INITIAL_EPSILON = float(args.InitialEpsilon) if args.InitialEpsilon else 0.1
     FINAL_EPSILON = float(args.FinalEpsilon) if args.FinalEpsilon else 0.0001
-    STEPS_TO_SAVE = float(args.StepsToSave) if args.StepsToSave else 1000
+    STEPS_TO_SAVE = int(args.StepsToSave) if args.StepsToSave else 1000
+    MINIBATCH_SIZE = int(args.MiniBatch) if args.MiniBatch else 16
     OBSERVE = args.Observe
 
     game_session = GameSession(
         session_env=env, initial_epsilon=INITIAL_EPSILON, final_epsilon=FINAL_EPSILON,
-        observe=OBSERVE, steps_to_save=STEPS_TO_SAVE,
+        observe=OBSERVE, steps_to_save=STEPS_TO_SAVE, minibatch_size=MINIBATCH_SIZE
     )
 
     try:
