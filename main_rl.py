@@ -278,7 +278,7 @@ if __name__ == '__main__':
         session_env=env, initial_epsilon=INITIAL_EPSILON, final_epsilon=FINAL_EPSILON,
         observe=OBSERVE, steps_to_save=STEPS_TO_SAVE, minibatch_size=MINIBATCH_SIZE
     )
-
+    game_session.run_complete_game()
     try:
         game_session.run_complete_game()
     except Exception as e:
