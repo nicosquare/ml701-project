@@ -13,17 +13,17 @@ from IPython.display import clear_output
 from time import time
 
 from utils.show_img import show_img
-from network.dqn import DQN
+from network.qnn import QNN
 
 
 class GameSession:
 
     def __init__(
             self, session_env, initial_epsilon=0.1, final_epsilon=0.0001, observe=False,
-            steps_to_observe=100, frames_to_action=1, frames_to_anneal=1000000, replay_memory_size=5000,
-            minibatch_size=16, n_actions=3, gamma=0.99, steps_to_save=1000,
-            loss_path='./models/rl/dqn/loss.csv', scores_path='./models/rl/dqn/scores.csv',
-            actions_path='./models/rl/dqn/actions.csv',
+            steps_to_observe=200, frames_to_action=1, frames_to_anneal=100000, replay_memory_size=5000,
+            minibatch_size=16, n_actions=3, gamma=0.99, steps_to_save=1000, learning_rate=1e-3,
+            loss_path='./models/rl/dqn_wo_img/loss.csv', scores_path='./models/rl/dqn_wo_img/scores.csv',
+            actions_path='./models/rl/dqn_wo_img/actions.csv',
     ):
 
         self.session_env = session_env
@@ -38,14 +38,15 @@ class GameSession:
         self.n_actions = n_actions
         self.gamma = gamma
         self.steps_to_save = steps_to_save
-        self.loss_path = './models/rl/dqn/loss_epsilon_i_{}_epsilon_f_{}_batch_{}.csv'\
-            .format(initial_epsilon, final_epsilon, minibatch_size)
-        self.scores_path = './models/rl/dqn/scores_epsilon_i_{}_epsilon_f_{}_batch_{}.csv'\
-            .format(initial_epsilon, final_epsilon, minibatch_size)
-        self.actions_path = './models/rl/dqn/actions_epsilon_i_{}_epsilon_f_{}_batch_{}.csv'\
-            .format(initial_epsilon, final_epsilon, minibatch_size)
-        self.model_path = './models/rl/dqn/model_epsilon_i_{}_epsilon_f_{}_batch_{}.pt'\
-            .format(initial_epsilon, final_epsilon, minibatch_size)
+        self.learning_rate = learning_rate
+        self.loss_path = './models/rl/dqn_wo_img/loss_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.csv'\
+            .format(initial_epsilon, final_epsilon, minibatch_size, learning_rate)
+        self.scores_path = './models/rl/dqn_wo_img/scores_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.csv'\
+            .format(initial_epsilon, final_epsilon, minibatch_size, learning_rate)
+        self.actions_path = './models/rl/dqn_wo_img/actions_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.csv'\
+            .format(initial_epsilon, final_epsilon, minibatch_size, learning_rate)
+        self.model_path = './models/rl/dqn_wo_img/model_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.pt'\
+            .format(initial_epsilon, final_epsilon, minibatch_size, learning_rate)
 
         # Display the processed image on screen using openCV, implemented using python coroutine
         self._display = show_img()
@@ -66,7 +67,7 @@ class GameSession:
 
     def run_complete_game(self):
 
-        model = DQN(model_path=self.model_path)
+        model = QNN(model_path=self.model_path)
         last_time = time()
         replay_memory = self.load_obj('replay_memory')
         self.session_env.reset()
@@ -74,11 +75,9 @@ class GameSession:
         # Build first 4 frames with action Do Nothing
 
         x_t, r_t, done, _ = self.session_env.step(0)
-        x_t = torch.from_numpy(x_t)
-        s_t = torch.stack((x_t, x_t, x_t, x_t))
-        s_t = torch.reshape(s_t, (1, s_t.shape[0], s_t.shape[1], s_t.shape[2]))
+        s_t = torch.from_numpy(x_t)
 
-        model.build_model(n_stacked_frames=s_t.shape[1], n_actions=self.n_actions, learning_rate=3e-3)
+        model.build_model(input_size=len(x_t), hidden_size=10, n_actions=self.n_actions, learning_rate=self.learning_rate)
 
         # Save initial state for resetting the terminal state
         initial_state = s_t
@@ -120,13 +119,9 @@ class GameSession:
             # Execute action
 
             x_t, r_t, done, info = self.session_env.step(a_t)
-            self._display.send(x_t)  # Display the observed image
+            self._display.send(info['preview'])  # Display the observed image
             print('fps: {0}'.format(1 / (time() - last_time)))  # helpful for measuring frame rate
-            x_t = torch.from_numpy(x_t)
-            x_t = torch.reshape(x_t, (1, 1, x_t.shape[0], x_t.shape[1]))
-
-            # Append the new image to input stack and remove the first one
-            s_t1 = torch.cat((x_t, s_t[:, :3, :, :]), dim=1)
+            s_t1 = torch.from_numpy(x_t)
 
             # Store the transition in Replay Memory
             replay_memory.append((s_t, a_t, r_t, s_t1, done))
@@ -205,16 +200,16 @@ class GameSession:
 
     def save_obj(self, obj, name):
 
-        file_name = 'models/rl/dqn/' + name + '_i_{}_epsilon_f_{}_batch_{}.pkl'\
-            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size)
+        file_name = 'models/rl/dqn_wo_img/' + name + '_i_{}_epsilon_f_{}_batch_{}_lr_{}.pkl'\
+            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size, self.learning_rate)
 
         with open(file_name, 'wb') as f:
             pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
     def load_obj(self, name):
 
-        file_name = 'models/rl/dqn/' + name + '_i_{}_epsilon_f_{}_batch_{}.pkl' \
-            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size)
+        file_name = 'models/rl/dqn_wo_img/' + name + '_i_{}_epsilon_f_{}_batch_{}_lr_{}.pkl' \
+            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size, self.learning_rate)
 
         try:
             with open(file_name, 'rb') as f:
@@ -224,22 +219,22 @@ class GameSession:
 
     def cache_file_exists(self, name):
 
-        file_name = 'models/rl/dqn/' + name + '_i_{}_epsilon_f_{}_batch_{}.pkl' \
-            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size)
+        file_name = 'models/rl/dqn_wo_img/' + name + '_i_{}_epsilon_f_{}_batch_{}_lr_{}.pkl' \
+            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size, self.learning_rate)
 
         return os.path.exists(file_name)
 
     def create_cache_file(self, name):
 
-        file_name = 'models/rl/dqn/' + name + '_i_{}_epsilon_f_{}_batch_{}.pkl' \
-            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size)
+        file_name = 'models/rl/dqn_wo_img/' + name + '_i_{}_epsilon_f_{}_batch_{}_lr_{}.pkl' \
+            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size, self.learning_rate)
 
         print('Creating {} file'.format(file_name))
         open(file_name, 'w+').close()
 
 
 def create_required_folders():
-    Path("models/rl/dqn").mkdir(parents=True, exist_ok=True)
+    Path("models/rl/dqn_wo_img").mkdir(parents=True, exist_ok=True)
 
 
 """
@@ -251,8 +246,12 @@ parser.add_argument("-i", "--InitialEpsilon", help="Initial epsilon")
 parser.add_argument("-f", "--FinalEpsilon", help="Final epsilon")
 parser.add_argument("-s", "--StepsToSave", help="Steps to save")
 parser.add_argument("-m", "--MiniBatch", help="Mini batch size")
+parser.add_argument("-r", "--Reward", help="Game time reward")
+parser.add_argument("-p", "--Penalty", help="Game over penalty")
+parser.add_argument("-l", "--LearningRate", help="Learning rate of the NN")
 parser.add_argument("-o", "--Observe", help="If used, no training is done, just playing", action='store_true')
-parser.add_argument("-n", "--NoBrowser", help="Run without UI", action='store_true')
+parser.add_argument("-n", "--NoBrowser", help="run without UI", action='store_true')
+parser.add_argument("-obs", "--Obstacle", help="number of obstacles to include")
 
 # Read arguments from command line
 args = parser.parse_args()
@@ -262,20 +261,34 @@ if __name__ == '__main__':
     # Guarantee the creation of required folders
     create_required_folders()
 
-    if not args.NoBrowser:
-        env = gym.make('ChromeDino-v0')
+    if args.Obstacle is None or int(args.Obstacle) == 1:
+        if not args.NoBrowser:
+            env = gym.make('ChromeDinoRLPoTwoObstacles-v0')
+        else:
+            env = gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0')
+    elif int(args.Obstacle) == 2:
+        if not args.NoBrowser:
+            env = gym.make('ChromeDinoRLPoTwoObstacles-v0')
+        else:
+            env = gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0')
     else:
-        env = gym.make('ChromeDinoNoBrowser-v0')
+        raise Exception('Just 1 or 2 obstacles are supported')
 
     INITIAL_EPSILON = float(args.InitialEpsilon) if args.InitialEpsilon else 0.1
     FINAL_EPSILON = float(args.FinalEpsilon) if args.FinalEpsilon else 0.0001
     STEPS_TO_SAVE = int(args.StepsToSave) if args.StepsToSave else 1000
     MINIBATCH_SIZE = int(args.MiniBatch) if args.MiniBatch else 16
+    REWARD = float(args.Reward) if args.Reward else 0.1
+    PENALTY = float(args.Penalty) if args.Penalty else -1.0
+    LEARNING_RATE = float(args.LearningRate) if args.LearningRate else 1e-3
     OBSERVE = args.Observe
+
+    env.set_gametime_reward(REWARD)
+    env.set_gameover_penalty(PENALTY)
 
     game_session = GameSession(
         session_env=env, initial_epsilon=INITIAL_EPSILON, final_epsilon=FINAL_EPSILON,
-        observe=OBSERVE, steps_to_save=STEPS_TO_SAVE, minibatch_size=MINIBATCH_SIZE
+        observe=OBSERVE, steps_to_save=STEPS_TO_SAVE, minibatch_size=MINIBATCH_SIZE, learning_rate=LEARNING_RATE
     )
     
     try:

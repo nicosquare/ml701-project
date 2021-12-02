@@ -1,23 +1,17 @@
+import argparse
 import os
 import pickle
-import random
 from pathlib import Path
-from collections import deque
 
 import gym
 import gym_chrome_dino
-import argparse
-import torch
-import pandas as pd
-from IPython.display import clear_output
-from time import time
-import matplotlib
 import matplotlib.pyplot as plt
-
 import numpy as np
+import pandas as pd
+import torch
 
-from utils.show_img import show_img
 from network.pg import PG
+from utils.show_img import show_img
 
 
 class GameSession:
@@ -62,10 +56,9 @@ class GameSession:
         self.q_values_df = pd \
             .read_csv(q_values_path) if os.path.isfile(q_values_path) else pd.DataFrame(columns=['q_values'])
 
-
     def train(self):
 
-        '''
+        """
         1. run the game
         2. get the parameters(probs, rewards, entropy)
         3. sum up total rewards
@@ -73,11 +66,11 @@ class GameSession:
         5. append rewards and entropy in to list
         6. backpropagation
 
-        '''
+        """
         # model = DQN()
         # model_optim = torch.optim.Adam(model.parameters(), lr=4e-3)
-        rewardHistory = []
-        entropyHistory = []
+        reward_history = []
+        entropy_history = []
         loss = []
 
         self.session_env.reset()
@@ -113,21 +106,20 @@ class GameSession:
             model_loss = -torch.mean(model_loss)
             print(model_loss)
             loss.append(float(model_loss))
-            rewardHistory.append(total_rewards)
-            entropyHistory.append(entropy)
+            reward_history.append(total_rewards)
+            entropy_history.append(entropy)
             model_optim.zero_grad()
             model_loss.backward()
             model_optim.step()
 
-        plt.plot(rewardHistory)
+        plt.plot(reward_history)
         # plt.plot(loss)
-        print(np.max(rewardHistory))
+        print(np.max(reward_history))
 
         plt.show()
 
-
     def run_complete_game(self, model, initial_state):
-        '''
+        """
         1. initialize variable
         2. run the game:
             2.1 get state
@@ -135,7 +127,7 @@ class GameSession:
             2.3 take action
             2.4 input reward into list
             2.5 repeat until die
-        '''
+        """
 
         self.session_env.reset()
         # t = self.load_obj('time')
@@ -169,12 +161,9 @@ class GameSession:
             print(t)
             t += 1
 
-
         print('end game...')
 
         return log_probs, rewards, entropies
-
-
 
     @staticmethod
     def save_obj(obj, name):
@@ -236,10 +225,10 @@ if __name__ == '__main__':
         session_env=env, initial_epsilon=INITIAL_EPSILON, final_epsilon=FINAL_EPSILON,
         observe=OBSERVE, steps_to_save=STEPS_TO_SAVE,
     )
-    game_session.train()
-    # try:
-    #     # game_session.run_complete_game()
-    # except Exception as e:
-    #     print('Closing environment due to exception')
-    #     print(e)
-    #     env.close()
+
+    try:
+        game_session.train()
+    except Exception as e:
+        print('Closing environment due to exception')
+        env.close()
+        raise e
