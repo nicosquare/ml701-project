@@ -1,6 +1,9 @@
 import csv
 import os
+import pickle
+import random
 from pathlib import Path
+from collections import deque
 
 import gym
 import gym_chrome_dino
@@ -42,16 +45,16 @@ class GameSession:
         reward_history = []
         entropy_history = []
         loss = []
-        save_iteration = 2
+        save_iteration = 1
         file_path = './models/rl_pl/reward_history.csv'
         self.session_env.reset()
 
         s_t, r_t, done, _ = self.session_env.step(0)
 
-        model = MLPTorch(s_t.size, 10, 3)
+        model = MLPTorch(s_t.size, 10, 2)
         model_optim = optim.Adam(model.parameters(), lr=4e-3)
 
-        no_iterations = 10
+        no_iterations = 1000
         for i in range(no_iterations):
             print('iteration: ', i)
             log_probs, rewards, entropy = self.run_complete_game(model, s_t)
@@ -60,7 +63,6 @@ class GameSession:
             total_rewards = np.sum(rewards)
             model_loss = torch.sum(torch.stack(log_probs, 0), 0) * torch.tensor(total_rewards)
             model_loss = -torch.mean(model_loss)
-            # print(model_loss)
             loss.append(float(model_loss))
             reward_history.append(total_rewards)
             entropy_history.append(entropy)
@@ -86,13 +88,21 @@ class GameSession:
                 # close the file
                 f.close()
                 print('Done writing into file. Clear Reward History...')
-                reward_history = []
+                #reward_history = []
 
-        # plt.plot(rewardHistory)
+        # print(loss)
+        # print(entropyHistory)
+        plt.figure(0)
+        plt.plot(entropy_history)
+        plt.figure(1)
+        plt.plot(loss)
+        plt.figure(2)
+        plt.plot(reward_history)
         # plt.plot(loss)
-        # print(np.max(rewardHistory))
+        print(np.max(rewardHistory))
 
         plt.show()
+
 
     def run_complete_game(self, model, initial_state):
         """
