@@ -4,7 +4,7 @@ from collections import OrderedDict
 
 import torch
 import torch.nn as nn
-from torch.nn import Sequential, Conv2d, MaxPool2d, ReLU, Flatten, Linear, MSELoss, BatchNorm2d
+from torch.nn import Sequential, Conv2d, MaxPool2d, ReLU, Flatten, Linear, MSELoss
 from torch.optim import Adam
 from torchinfo import summary
 

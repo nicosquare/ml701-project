@@ -112,7 +112,6 @@ if __name__ == '__main__':
             env = gym.make('ChromeDinoGATwoObstacle-v0')
         else:
             env = gym.make('ChromeDinoGATwoObstacleNoBrowser-v0')
-
     else:
         raise Exception('Just 1 or 2 obstacles are supported')
 
