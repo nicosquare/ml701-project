@@ -15,13 +15,17 @@ from time import time
 from utils.show_img import show_img
 from network.dqn import DQN
 
+import wandb
+
+wandb.init(project="dqn-images", entity="madog")
+
 
 class GameSession:
 
     def __init__(
             self, session_env, initial_epsilon=0.1, final_epsilon=0.0001, observe=False,
             steps_to_observe=100, frames_to_action=1, frames_to_anneal=1000000, replay_memory_size=5000,
-            minibatch_size=16, n_actions=3, gamma=0.99, steps_to_save=1000,
+            minibatch_size=16, n_actions=3, gamma=0.99, steps_to_save=1000, learning_rate=1e-3,
             loss_path='./models/rl/dqn/loss.csv', scores_path='./models/rl/dqn/scores.csv',
             actions_path='./models/rl/dqn/actions.csv',
     ):
@@ -38,14 +42,29 @@ class GameSession:
         self.n_actions = n_actions
         self.gamma = gamma
         self.steps_to_save = steps_to_save
-        self.loss_path = './models/rl/dqn/loss_epsilon_i_{}_epsilon_f_{}_batch_{}.csv'\
+        self.learning_rate = learning_rate
+        self.loss_path = './models/rl/dqn/loss_epsilon_i_{}_epsilon_f_{}_batch_{}.csv' \
             .format(initial_epsilon, final_epsilon, minibatch_size)
-        self.scores_path = './models/rl/dqn/scores_epsilon_i_{}_epsilon_f_{}_batch_{}.csv'\
+        self.scores_path = './models/rl/dqn/scores_epsilon_i_{}_epsilon_f_{}_batch_{}.csv' \
             .format(initial_epsilon, final_epsilon, minibatch_size)
-        self.actions_path = './models/rl/dqn/actions_epsilon_i_{}_epsilon_f_{}_batch_{}.csv'\
+        self.actions_path = './models/rl/dqn/actions_epsilon_i_{}_epsilon_f_{}_batch_{}.csv' \
             .format(initial_epsilon, final_epsilon, minibatch_size)
-        self.model_path = './models/rl/dqn/model_epsilon_i_{}_epsilon_f_{}_batch_{}.pt'\
+        self.model_path = './models/rl/dqn/model_epsilon_i_{}_epsilon_f_{}_batch_{}.pt' \
             .format(initial_epsilon, final_epsilon, minibatch_size)
+
+        wandb.config = {
+            "initial_epsilon": initial_epsilon,
+            "final_epsilon": final_epsilon,
+            "observe": observe,
+            "steps_to_observe": steps_to_observe,
+            "frames_to_action": frames_to_action,
+            "frames_to_anneal": frames_to_anneal,
+            "replay_memory_size": replay_memory_size,
+            "minibatch_size": minibatch_size,
+            "n_actions": n_actions,
+            "gamma": gamma,
+            "steps_to_save": steps_to_save
+        }
 
         # Display the processed image on screen using openCV, implemented using python coroutine
         self._display = show_img()
@@ -71,6 +90,9 @@ class GameSession:
         replay_memory = self.load_obj('replay_memory')
         self.session_env.reset()
 
+        # Hooks into the model to collect gradients and topology
+        wandb.watch(model)
+
         # Build first 4 frames with action Do Nothing
 
         x_t, r_t, done, _ = self.session_env.step(0)
@@ -78,7 +100,7 @@ class GameSession:
         s_t = torch.stack((x_t, x_t, x_t, x_t))
         s_t = torch.reshape(s_t, (1, s_t.shape[0], s_t.shape[1], s_t.shape[2]))
 
-        model.build_model(n_stacked_frames=s_t.shape[1], n_actions=self.n_actions, learning_rate=3e-3)
+        model.build_model(n_stacked_frames=s_t.shape[1], n_actions=self.n_actions, learning_rate=self.learning_rate)
 
         # Save initial state for resetting the terminal state
         initial_state = s_t
@@ -154,6 +176,7 @@ class GameSession:
             if done:
                 s_t = initial_state
                 self.scores_df.loc[len(self.scores_df)] = info["score"]
+                wandb.log({"scores": info["score"]})
             else:
                 s_t = s_t1
 
@@ -185,6 +208,10 @@ class GameSession:
             else:
                 state = "train"
 
+            wandb.log({"loss": loss})
+            wandb.log({"epsilon": epsilon})
+            wandb.log({"action": a_t})
+
             print('Step: {}, State: {}, epsilon: {}, action: {}, reward: {}, loss: {}'.format(
                 t, state, epsilon, a_t, r_t, loss
             ))
@@ -205,7 +232,7 @@ class GameSession:
 
     def save_obj(self, obj, name):
 
-        file_name = 'models/rl/dqn/' + name + '_i_{}_epsilon_f_{}_batch_{}.pkl'\
+        file_name = 'models/rl/dqn/' + name + '_i_{}_epsilon_f_{}_batch_{}.pkl' \
             .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size)
 
         with open(file_name, 'wb') as f:
@@ -274,10 +301,13 @@ if __name__ == '__main__':
     OBSERVE = args.Observe
 
     game_session = GameSession(
+        n_actions=2, frames_to_anneal=100000, replay_memory_size=50000, learning_rate=1e-4,
         session_env=env, initial_epsilon=INITIAL_EPSILON, final_epsilon=FINAL_EPSILON,
         observe=OBSERVE, steps_to_save=STEPS_TO_SAVE, minibatch_size=MINIBATCH_SIZE
     )
-    
+
+    env.set_acceleration(False)
+
     try:
         game_session.run_complete_game()
     except Exception as e:

@@ -9,11 +9,17 @@ import gym_chrome_dino
 import argparse
 import torch
 import pandas as pd
+
+import wandb
 from IPython.display import clear_output
 from time import time
 
 from utils.show_img import show_img
 from network.qnn import QNN
+
+from stable_baselines3 import DQN
+from stable_baselines3.common.monitor import Monitor
+from wandb.integration.sb3 import WandbCallback
 
 
 class GameSession:
@@ -39,14 +45,28 @@ class GameSession:
         self.gamma = gamma
         self.steps_to_save = steps_to_save
         self.learning_rate = learning_rate
-        self.loss_path = './models/rl/dqn_wo_img/loss_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.csv'\
+        self.loss_path = './models/rl/dqn_wo_img/loss_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.csv' \
             .format(initial_epsilon, final_epsilon, minibatch_size, learning_rate)
-        self.scores_path = './models/rl/dqn_wo_img/scores_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.csv'\
+        self.scores_path = './models/rl/dqn_wo_img/scores_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.csv' \
             .format(initial_epsilon, final_epsilon, minibatch_size, learning_rate)
-        self.actions_path = './models/rl/dqn_wo_img/actions_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.csv'\
+        self.actions_path = './models/rl/dqn_wo_img/actions_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.csv' \
             .format(initial_epsilon, final_epsilon, minibatch_size, learning_rate)
-        self.model_path = './models/rl/dqn_wo_img/model_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.pt'\
+        self.model_path = './models/rl/dqn_wo_img/model_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.pt' \
             .format(initial_epsilon, final_epsilon, minibatch_size, learning_rate)
+
+        wandb.config = {
+            "initial_epsilon": initial_epsilon,
+            "final_epsilon": final_epsilon,
+            "observe": observe,
+            "steps_to_observe": steps_to_observe,
+            "frames_to_action": frames_to_action,
+            "frames_to_anneal": frames_to_anneal,
+            "replay_memory_size": replay_memory_size,
+            "minibatch_size": minibatch_size,
+            "n_actions": n_actions,
+            "gamma": gamma,
+            "steps_to_save": steps_to_save
+        }
 
         # Display the processed image on screen using openCV, implemented using python coroutine
         self._display = show_img()
@@ -72,12 +92,16 @@ class GameSession:
         replay_memory = self.load_obj('replay_memory')
         self.session_env.reset()
 
+        # Hooks into the model to collect gradients and topology
+        wandb.watch(model)
+
         # Build first 4 frames with action Do Nothing
 
         x_t, r_t, done, _ = self.session_env.step(0)
         s_t = torch.from_numpy(x_t)
 
-        model.build_model(input_size=len(x_t), hidden_size=10, n_actions=self.n_actions, learning_rate=self.learning_rate)
+        model.build_model(input_size=len(x_t), hidden_size=10, n_actions=self.n_actions,
+                          learning_rate=self.learning_rate)
 
         # Save initial state for resetting the terminal state
         initial_state = s_t
@@ -149,6 +173,7 @@ class GameSession:
             if done:
                 s_t = initial_state
                 self.scores_df.loc[len(self.scores_df)] = info["score"]
+                wandb.log({"scores": info["score"]})
             else:
                 s_t = s_t1
 
@@ -180,6 +205,10 @@ class GameSession:
             else:
                 state = "train"
 
+            wandb.log({"loss": loss})
+            wandb.log({"epsilon": epsilon})
+            wandb.log({"action": a_t})
+
             print('Step: {}, State: {}, epsilon: {}, action: {}, reward: {}, loss: {}'.format(
                 t, state, epsilon, a_t, r_t, loss
             ))
@@ -200,7 +229,7 @@ class GameSession:
 
     def save_obj(self, obj, name):
 
-        file_name = 'models/rl/dqn_wo_img/' + name + '_i_{}_epsilon_f_{}_batch_{}_lr_{}.pkl'\
+        file_name = 'models/rl/dqn_wo_img/' + name + '_i_{}_epsilon_f_{}_batch_{}_lr_{}.pkl' \
             .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size, self.learning_rate)
 
         with open(file_name, 'wb') as f:
@@ -237,6 +266,10 @@ def create_required_folders():
     Path("models/rl/dqn_wo_img").mkdir(parents=True, exist_ok=True)
 
 
+def make_env(env):
+    return Monitor(env)
+
+
 """
     Main method definition
 """
@@ -252,6 +285,7 @@ parser.add_argument("-l", "--LearningRate", help="Learning rate of the NN")
 parser.add_argument("-o", "--Observe", help="If used, no training is done, just playing", action='store_true')
 parser.add_argument("-n", "--NoBrowser", help="run without UI", action='store_true')
 parser.add_argument("-obs", "--Obstacle", help="number of obstacles to include")
+parser.add_argument("-sb", "--StableBaselines", help="Run Stable Baselines DQN", action='store_true')
 
 # Read arguments from command line
 args = parser.parse_args()
@@ -280,20 +314,80 @@ if __name__ == '__main__':
     MINIBATCH_SIZE = int(args.MiniBatch) if args.MiniBatch else 16
     REWARD = float(args.Reward) if args.Reward else 0.1
     PENALTY = float(args.Penalty) if args.Penalty else -1.0
-    LEARNING_RATE = float(args.LearningRate) if args.LearningRate else 1e-3
+    LEARNING_RATE = float(args.LearningRate) if args.LearningRate else 1e-4
     OBSERVE = args.Observe
+    SB = args.StableBaselines
 
     env.set_gametime_reward(REWARD)
     env.set_gameover_penalty(PENALTY)
+    env.set_acceleration(False)
 
-    game_session = GameSession(
-        session_env=env, initial_epsilon=INITIAL_EPSILON, final_epsilon=FINAL_EPSILON,
-        observe=OBSERVE, steps_to_save=STEPS_TO_SAVE, minibatch_size=MINIBATCH_SIZE, learning_rate=LEARNING_RATE
-    )
-    
-    try:
-        game_session.run_complete_game()
-    except Exception as e:
-        print('Closing environment due to exception')
-        env.close()
-        raise e
+    if not SB:
+
+        wandb.init(project="dqn-features", entity="madog")
+
+        game_session = GameSession(
+            n_actions=2, frames_to_anneal=100000, replay_memory_size=50000,
+            session_env=env, initial_epsilon=INITIAL_EPSILON, final_epsilon=FINAL_EPSILON,
+            observe=OBSERVE, steps_to_save=STEPS_TO_SAVE, minibatch_size=MINIBATCH_SIZE, learning_rate=LEARNING_RATE
+        )
+
+        try:
+            game_session.run_complete_game()
+        except Exception as e:
+            print('Closing environment due to exception')
+            env.close()
+            raise e
+
+    else:
+
+        print("Run stable-baselines DQN")
+
+        wandb.init(project="dqn-features-sb", entity="madog")
+
+        # num_cpu = 4
+        # env = SubprocVecEnv([lambda: make_env(env=env) for i in range(num_cpu)])
+
+        env = Monitor(env)
+
+        run = wandb.init(
+            project='dqn-sb3',
+            sync_tensorboard=True,
+            monitor_gym=True,
+            save_code=True,
+        )
+
+        model = DQN(
+            policy="MlpPolicy",
+            env=env,
+            verbose=1,
+            learning_rate=LEARNING_RATE,
+            learning_starts=100,
+            batch_size=MINIBATCH_SIZE,
+        )
+
+        model.learn(
+            total_timesteps=10,
+            n_eval_episodes=10,
+            log_interval=4,
+            callback=WandbCallback()
+        )
+
+        model.save("models/rl/dqn_sb/dqn_dino")
+
+        api = wandb.Api()
+
+        api_run = api.run(f"madog/dqn-images-sb/{run.id}")
+        history = api_run.scan_history()
+
+        print("asdasdasdsadsa", history)
+
+        for row in history:
+
+            print("+++++++ loss: {}".format(row["loss"]))
+            wandb.log({"loss": row["loss"]})
+
+        run.finish()
+
+        print("END!!!!!")
+
