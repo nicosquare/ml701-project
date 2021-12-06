@@ -12,13 +12,18 @@ import pandas as pd
 from IPython.display import clear_output
 from time import time
 
+from stable_baselines3.common.vec_env import DummyVecEnv
+
 from utils.show_img import show_img
-from network.dqn import DQN
+from network.dqn import DQN as MyDQN
 
 import wandb
 
-wandb.init(project="dqn-images", entity="madog")
+from stable_baselines3 import DQN
+from stable_baselines3.common.monitor import Monitor
+from wandb.integration.sb3 import WandbCallback
 
+from stable_baselines3.common.env_checker import check_env
 
 class GameSession:
 
@@ -85,7 +90,7 @@ class GameSession:
 
     def run_complete_game(self):
 
-        model = DQN(model_path=self.model_path)
+        model = MyDQN(model_path=self.model_path)
         last_time = time()
         replay_memory = self.load_obj('replay_memory')
         self.session_env.reset()
@@ -278,39 +283,108 @@ parser.add_argument("-i", "--InitialEpsilon", help="Initial epsilon")
 parser.add_argument("-f", "--FinalEpsilon", help="Final epsilon")
 parser.add_argument("-s", "--StepsToSave", help="Steps to save")
 parser.add_argument("-m", "--MiniBatch", help="Mini batch size")
+parser.add_argument("-r", "--Reward", help="Game time reward")
+parser.add_argument("-p", "--Penalty", help="Game over penalty")
+parser.add_argument("-l", "--LearningRate", help="Learning rate of the NN")
 parser.add_argument("-o", "--Observe", help="If used, no training is done, just playing", action='store_true')
 parser.add_argument("-n", "--NoBrowser", help="Run without UI", action='store_true')
+parser.add_argument("-sb", "--StableBaselines", help="Run Stable Baselines DQN", action='store_true')
 
 # Read arguments from command line
 args = parser.parse_args()
 
 if __name__ == '__main__':
 
+    wandb.init(project="dqn-images", entity="madog")
+
     # Guarantee the creation of required folders
     create_required_folders()
-
-    if not args.NoBrowser:
-        env = gym.make('ChromeDino-v0')
-    else:
-        env = gym.make('ChromeDinoNoBrowser-v0')
 
     INITIAL_EPSILON = float(args.InitialEpsilon) if args.InitialEpsilon else 0.1
     FINAL_EPSILON = float(args.FinalEpsilon) if args.FinalEpsilon else 0.0001
     STEPS_TO_SAVE = int(args.StepsToSave) if args.StepsToSave else 1000
     MINIBATCH_SIZE = int(args.MiniBatch) if args.MiniBatch else 16
+    REWARD = float(args.Reward) if args.Reward else 0.1
+    PENALTY = float(args.Penalty) if args.Penalty else -1.0
+    LEARNING_RATE = float(args.LearningRate) if args.LearningRate else 1e-4
     OBSERVE = args.Observe
+    SB = args.StableBaselines
 
-    game_session = GameSession(
-        n_actions=2, frames_to_anneal=100000, replay_memory_size=50000, learning_rate=1e-4,
-        session_env=env, initial_epsilon=INITIAL_EPSILON, final_epsilon=FINAL_EPSILON,
-        observe=OBSERVE, steps_to_save=STEPS_TO_SAVE, minibatch_size=MINIBATCH_SIZE
-    )
+    if not SB:
 
-    env.set_acceleration(False)
+        if not args.NoBrowser:
+            env = gym.make('ChromeDino-v0')
+        else:
+            env = gym.make('ChromeDinoNoBrowser-v0')
 
-    try:
-        game_session.run_complete_game()
-    except Exception as e:
-        print('Closing environment due to exception')
-        env.close()
-        raise e
+        game_session = GameSession(
+            n_actions=2, frames_to_anneal=1000000, replay_memory_size=50000, learning_rate=LEARNING_RATE,
+            session_env=env, initial_epsilon=INITIAL_EPSILON, final_epsilon=FINAL_EPSILON,
+            observe=OBSERVE, steps_to_save=STEPS_TO_SAVE, minibatch_size=MINIBATCH_SIZE
+        )
+
+        env.set_acceleration(False)
+
+        try:
+            game_session.run_complete_game()
+        except Exception as e:
+            print('Closing environment due to exception')
+            env.close()
+            raise e
+
+    else:
+
+        # def make_env():
+        #
+        #     if not args.NoBrowser:
+        #         return Monitor(gym.make('ChromeDinoNotNorm-v0'))
+        #     else:
+        #         return Monitor(gym.make('ChromeDinoNotNormNoBrowser-v0'))
+        #
+        # run = wandb.init(
+        #     project='dqn-images-sb',
+        #     entity="madog",
+        #     sync_tensorboard=True,
+        #     monitor_gym=True,
+        #     save_code=True,
+        # )
+        #
+        # model = DQN(
+        #     policy="CnnPolicy",
+        #     env=make_env(),
+        #     verbose=1,
+        #     learning_rate=LEARNING_RATE,
+        #     learning_starts=100,
+        #     batch_size=MINIBATCH_SIZE,
+        #     device='cpu'
+        # )
+        #
+        # model.learn(
+        #     total_timesteps=1000000,
+        #     n_eval_episodes=10,
+        #     log_interval=4,
+        #     callback=WandbCallback(
+        #         model_save_freq=100,
+        #         verbose=1,
+        #         gradient_save_freq=10,
+        #         model_save_path=f"models/rl/dqn_wo_img/images/{run.id}"
+        #     )
+        # )
+        #
+        # model.save(f"models/rl/dqn_sb/images/dqn_dino_{run.id}")
+
+        # run.finish()
+
+        model = DQN.load("./models/rl/dqn_sb/features/dqn_dino_xk9hv8es.zip")
+
+        env = DummyVecEnv([lambda: gym.make('ChromeDinoRLPoTwoObstacles-v0')])
+        #     env = VecNormalize.load(stats_path, env)
+        env.training = False
+
+        obs = env.reset()
+        while True:
+            action, _states = model.predict(obs, deterministic=True)
+            obs, reward, done, info = env.step(action)
+            # env.render()
+            if done:
+                obs = env.reset()

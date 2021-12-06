@@ -9,6 +9,7 @@ import gym_chrome_dino
 import argparse
 import torch
 import pandas as pd
+from mkl import verbose
 
 import wandb
 from IPython.display import clear_output
@@ -266,10 +267,6 @@ def create_required_folders():
     Path("models/rl/dqn_wo_img").mkdir(parents=True, exist_ok=True)
 
 
-def make_env(env):
-    return Monitor(env)
-
-
 """
     Main method definition
 """
@@ -295,19 +292,6 @@ if __name__ == '__main__':
     # Guarantee the creation of required folders
     create_required_folders()
 
-    if args.Obstacle is None or int(args.Obstacle) == 1:
-        if not args.NoBrowser:
-            env = gym.make('ChromeDinoRLPoTwoObstacles-v0')
-        else:
-            env = gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0')
-    elif int(args.Obstacle) == 2:
-        if not args.NoBrowser:
-            env = gym.make('ChromeDinoRLPoTwoObstacles-v0')
-        else:
-            env = gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0')
-    else:
-        raise Exception('Just 1 or 2 obstacles are supported')
-
     INITIAL_EPSILON = float(args.InitialEpsilon) if args.InitialEpsilon else 0.1
     FINAL_EPSILON = float(args.FinalEpsilon) if args.FinalEpsilon else 0.0001
     STEPS_TO_SAVE = int(args.StepsToSave) if args.StepsToSave else 1000
@@ -318,11 +302,24 @@ if __name__ == '__main__':
     OBSERVE = args.Observe
     SB = args.StableBaselines
 
-    env.set_gametime_reward(REWARD)
-    env.set_gameover_penalty(PENALTY)
-    env.set_acceleration(False)
-
     if not SB:
+
+        if args.Obstacle is None or int(args.Obstacle) == 1:
+            if not args.NoBrowser:
+                env = gym.make('ChromeDinoRLPoTwoObstacles-v0')
+            else:
+                env = gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0')
+        elif int(args.Obstacle) == 2:
+            if not args.NoBrowser:
+                env = gym.make('ChromeDinoRLPoTwoObstacles-v0')
+            else:
+                env = gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0')
+        else:
+            raise Exception('Just 1 or 2 obstacles are supported')
+
+        env.set_gametime_reward(REWARD)
+        env.set_gameover_penalty(PENALTY)
+        env.set_acceleration(False)
 
         wandb.init(project="dqn-features", entity="madog")
 
@@ -341,17 +338,24 @@ if __name__ == '__main__':
 
     else:
 
-        print("Run stable-baselines DQN")
+        def make_env():
 
-        wandb.init(project="dqn-features-sb", entity="madog")
-
-        # num_cpu = 4
-        # env = SubprocVecEnv([lambda: make_env(env=env) for i in range(num_cpu)])
-
-        env = Monitor(env)
+            if args.Obstacle is None or int(args.Obstacle) == 1:
+                if not args.NoBrowser:
+                    return Monitor(gym.make('ChromeDinoRLPoTwoObstacles-v0'))
+                else:
+                    return Monitor(gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0'))
+            elif int(args.Obstacle) == 2:
+                if not args.NoBrowser:
+                    return Monitor(gym.make('ChromeDinoRLPoTwoObstacles-v0'))
+                else:
+                    return Monitor(gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0'))
+            else:
+                raise Exception('Just 1 or 2 obstacles are supported')
 
         run = wandb.init(
-            project='dqn-sb3',
+            project='dqn-features-sb',
+            entity="madog",
             sync_tensorboard=True,
             monitor_gym=True,
             save_code=True,
@@ -359,35 +363,27 @@ if __name__ == '__main__':
 
         model = DQN(
             policy="MlpPolicy",
-            env=env,
+            env=make_env(),
             verbose=1,
             learning_rate=LEARNING_RATE,
             learning_starts=100,
             batch_size=MINIBATCH_SIZE,
+            device='cpu'
         )
 
         model.learn(
-            total_timesteps=10,
+            total_timesteps=1000000,
             n_eval_episodes=10,
             log_interval=4,
-            callback=WandbCallback()
+            callback=WandbCallback(
+                model_save_freq=100,
+                verbose=1,
+                gradient_save_freq=10,
+                model_save_path=f"models/rl/dqn_wo_img/features/{run.id}"
+            )
         )
 
-        model.save("models/rl/dqn_sb/dqn_dino")
-
-        api = wandb.Api()
-
-        api_run = api.run(f"madog/dqn-images-sb/{run.id}")
-        history = api_run.scan_history()
-
-        print("asdasdasdsadsa", history)
-
-        for row in history:
-
-            print("+++++++ loss: {}".format(row["loss"]))
-            wandb.log({"loss": row["loss"]})
+        model.save(f"models/rl/dqn_sb/features/dqn_dino_{run.id}")
 
         run.finish()
-
-        print("END!!!!!")
 
