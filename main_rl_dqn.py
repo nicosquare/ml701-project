@@ -5,20 +5,20 @@ from pathlib import Path
 from collections import deque
 
 import gym
-import gym_chrome_dino
+import gym_chrome_dino  # This should be kept as it is registering the custom environments
 import argparse
 import torch
 import pandas as pd
-from mkl import verbose
-
-import wandb
 from IPython.display import clear_output
 from time import time
 
 from utils.show_img import show_img
-from network.qnn import QNN
+from network.dqn import DQN as MyDQN
+
+import wandb
 
 from stable_baselines3 import DQN
+from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
 from wandb.integration.sb3 import WandbCallback
 
@@ -26,11 +26,11 @@ from wandb.integration.sb3 import WandbCallback
 class GameSession:
 
     def __init__(
-            self, session_env, initial_epsilon=0.1, final_epsilon=0.0001, observe=False,
-            steps_to_observe=200, frames_to_action=1, frames_to_anneal=100000, replay_memory_size=5000,
+            self, session_env, initial_epsilon=0.1, final_epsilon=0.0001, observe=False, model_id=1,
+            steps_to_observe=100, frames_to_action=1, frames_to_anneal=1000000, replay_memory_size=5000,
             minibatch_size=16, n_actions=3, gamma=0.99, steps_to_save=1000, learning_rate=1e-3,
-            loss_path='./models/rl/dqn_wo_img/loss.csv', scores_path='./models/rl/dqn_wo_img/scores.csv',
-            actions_path='./models/rl/dqn_wo_img/actions.csv',
+            loss_path='./models/rl/dqn/loss.csv', scores_path='./models/rl/dqn/scores.csv',
+            actions_path='./models/rl/dqn/actions.csv',
     ):
 
         self.session_env = session_env
@@ -45,15 +45,16 @@ class GameSession:
         self.n_actions = n_actions
         self.gamma = gamma
         self.steps_to_save = steps_to_save
+        self.model_id = model_id
         self.learning_rate = learning_rate
-        self.loss_path = './models/rl/dqn_wo_img/loss_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.csv' \
-            .format(initial_epsilon, final_epsilon, minibatch_size, learning_rate)
-        self.scores_path = './models/rl/dqn_wo_img/scores_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.csv' \
-            .format(initial_epsilon, final_epsilon, minibatch_size, learning_rate)
-        self.actions_path = './models/rl/dqn_wo_img/actions_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.csv' \
-            .format(initial_epsilon, final_epsilon, minibatch_size, learning_rate)
-        self.model_path = './models/rl/dqn_wo_img/model_epsilon_i_{}_epsilon_f_{}_batch_{}_lr_{}.pt' \
-            .format(initial_epsilon, final_epsilon, minibatch_size, learning_rate)
+        self.loss_path = './models/rl/dqn/loss_epsilon_i_{}_epsilon_f_{}_batch_{}.csv' \
+            .format(initial_epsilon, final_epsilon, minibatch_size)
+        self.scores_path = './models/rl/dqn/scores_epsilon_i_{}_epsilon_f_{}_batch_{}.csv' \
+            .format(initial_epsilon, final_epsilon, minibatch_size)
+        self.actions_path = './models/rl/dqn/actions_epsilon_i_{}_epsilon_f_{}_batch_{}.csv' \
+            .format(initial_epsilon, final_epsilon, minibatch_size)
+        self.model_path = './models/rl/dqn/model_epsilon_i_{}_epsilon_f_{}_batch_{}.pt' \
+            .format(initial_epsilon, final_epsilon, minibatch_size)
 
         wandb.config = {
             "initial_epsilon": initial_epsilon,
@@ -88,7 +89,7 @@ class GameSession:
 
     def run_complete_game(self):
 
-        model = QNN(model_path=self.model_path)
+        model = MyDQN(model_path=self.model_path)
         last_time = time()
         replay_memory = self.load_obj('replay_memory')
         self.session_env.reset()
@@ -99,10 +100,14 @@ class GameSession:
         # Build first 4 frames with action Do Nothing
 
         x_t, r_t, done, _ = self.session_env.step(0)
-        s_t = torch.from_numpy(x_t)
+        x_t = torch.from_numpy(x_t)
+        s_t = torch.stack((x_t, x_t, x_t, x_t))
+        s_t = torch.reshape(s_t, (1, s_t.shape[0], s_t.shape[1], s_t.shape[2]))
 
-        model.build_model(input_size=len(x_t), hidden_size=10, n_actions=self.n_actions,
-                          learning_rate=self.learning_rate)
+        model.build_model(
+            n_stacked_frames=s_t.shape[1], n_actions=self.n_actions, learning_rate=self.learning_rate,
+            model_id=self.model_id
+        )
 
         # Save initial state for resetting the terminal state
         initial_state = s_t
@@ -144,9 +149,13 @@ class GameSession:
             # Execute action
 
             x_t, r_t, done, info = self.session_env.step(a_t)
-            self._display.send(info['preview'])  # Display the observed image
+            self._display.send(x_t)  # Display the observed image
             print('fps: {0}'.format(1 / (time() - last_time)))  # helpful for measuring frame rate
-            s_t1 = torch.from_numpy(x_t)
+            x_t = torch.from_numpy(x_t)
+            x_t = torch.reshape(x_t, (1, 1, x_t.shape[0], x_t.shape[1]))
+
+            # Append the new image to input stack and remove the first one
+            s_t1 = torch.cat((x_t, s_t[:, :3, :, :]), dim=1)
 
             # Store the transition in Replay Memory
             replay_memory.append((s_t, a_t, r_t, s_t1, done))
@@ -230,16 +239,16 @@ class GameSession:
 
     def save_obj(self, obj, name):
 
-        file_name = 'models/rl/dqn_wo_img/' + name + '_i_{}_epsilon_f_{}_batch_{}_lr_{}.pkl' \
-            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size, self.learning_rate)
+        file_name = 'models/rl/dqn/' + name + '_i_{}_epsilon_f_{}_batch_{}.pkl' \
+            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size)
 
         with open(file_name, 'wb') as f:
             pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
     def load_obj(self, name):
 
-        file_name = 'models/rl/dqn_wo_img/' + name + '_i_{}_epsilon_f_{}_batch_{}_lr_{}.pkl' \
-            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size, self.learning_rate)
+        file_name = 'models/rl/dqn/' + name + '_i_{}_epsilon_f_{}_batch_{}.pkl' \
+            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size)
 
         try:
             with open(file_name, 'rb') as f:
@@ -249,22 +258,22 @@ class GameSession:
 
     def cache_file_exists(self, name):
 
-        file_name = 'models/rl/dqn_wo_img/' + name + '_i_{}_epsilon_f_{}_batch_{}_lr_{}.pkl' \
-            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size, self.learning_rate)
+        file_name = 'models/rl/dqn/' + name + '_i_{}_epsilon_f_{}_batch_{}.pkl' \
+            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size)
 
         return os.path.exists(file_name)
 
     def create_cache_file(self, name):
 
-        file_name = 'models/rl/dqn_wo_img/' + name + '_i_{}_epsilon_f_{}_batch_{}_lr_{}.pkl' \
-            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size, self.learning_rate)
+        file_name = 'models/rl/dqn/' + name + '_i_{}_epsilon_f_{}_batch_{}.pkl' \
+            .format(self.initial_epsilon, self.final_epsilon, self.minibatch_size)
 
         print('Creating {} file'.format(file_name))
         open(file_name, 'w+').close()
 
 
 def create_required_folders():
-    Path("models/rl/dqn_wo_img").mkdir(parents=True, exist_ok=True)
+    Path("models/rl/dqn").mkdir(parents=True, exist_ok=True)
 
 
 """
@@ -279,15 +288,17 @@ parser.add_argument("-m", "--MiniBatch", help="Mini batch size")
 parser.add_argument("-r", "--Reward", help="Game time reward")
 parser.add_argument("-p", "--Penalty", help="Game over penalty")
 parser.add_argument("-l", "--LearningRate", help="Learning rate of the NN")
+parser.add_argument("-mid", "--ModelId", help="Id of model to use in the CNN")
 parser.add_argument("-o", "--Observe", help="If used, no training is done, just playing", action='store_true')
-parser.add_argument("-n", "--NoBrowser", help="run without UI", action='store_true')
-parser.add_argument("-obs", "--Obstacle", help="number of obstacles to include")
+parser.add_argument("-n", "--NoBrowser", help="Run without UI", action='store_true')
 parser.add_argument("-sb", "--StableBaselines", help="Run Stable Baselines DQN", action='store_true')
 
 # Read arguments from command line
 args = parser.parse_args()
 
 if __name__ == '__main__':
+
+    wandb.init(project="dqn-images", entity="madog")
 
     # Guarantee the creation of required folders
     create_required_folders()
@@ -299,35 +310,25 @@ if __name__ == '__main__':
     REWARD = float(args.Reward) if args.Reward else 0.1
     PENALTY = float(args.Penalty) if args.Penalty else -1.0
     LEARNING_RATE = float(args.LearningRate) if args.LearningRate else 1e-4
+    MODEL_ID = int(args.ModelId) if args.ModelId else 1
     OBSERVE = args.Observe
     SB = args.StableBaselines
 
     if not SB:
 
-        if args.Obstacle is None or int(args.Obstacle) == 1:
-            if not args.NoBrowser:
-                env = gym.make('ChromeDinoRLPoTwoObstacles-v0')
-            else:
-                env = gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0')
-        elif int(args.Obstacle) == 2:
-            if not args.NoBrowser:
-                env = gym.make('ChromeDinoRLPoTwoObstacles-v0')
-            else:
-                env = gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0')
+        if not args.NoBrowser:
+            env = gym.make('ChromeDino-v0')
         else:
-            raise Exception('Just 1 or 2 obstacles are supported')
-
-        env.set_gametime_reward(REWARD)
-        env.set_gameover_penalty(PENALTY)
-        env.set_acceleration(False)
-
-        wandb.init(project="dqn-features", entity="madog")
+            env = gym.make('ChromeDinoNoBrowser-v0')
 
         game_session = GameSession(
-            n_actions=2, frames_to_anneal=100000, replay_memory_size=50000,
+            n_actions=2, frames_to_anneal=1000000, replay_memory_size=50000, learning_rate=LEARNING_RATE,
             session_env=env, initial_epsilon=INITIAL_EPSILON, final_epsilon=FINAL_EPSILON,
-            observe=OBSERVE, steps_to_save=STEPS_TO_SAVE, minibatch_size=MINIBATCH_SIZE, learning_rate=LEARNING_RATE
+            observe=OBSERVE, steps_to_save=STEPS_TO_SAVE, minibatch_size=MINIBATCH_SIZE,
+            model_id=MODEL_ID
         )
+
+        env.set_acceleration(False)
 
         try:
             game_session.run_complete_game()
@@ -338,52 +339,62 @@ if __name__ == '__main__':
 
     else:
 
-        def make_env():
+        if not OBSERVE:
 
-            if args.Obstacle is None or int(args.Obstacle) == 1:
+            def make_env():
+
                 if not args.NoBrowser:
-                    return Monitor(gym.make('ChromeDinoRLPoTwoObstacles-v0'))
+                    return Monitor(gym.make('ChromeDinoNotNorm-v0'))
                 else:
-                    return Monitor(gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0'))
-            elif int(args.Obstacle) == 2:
-                if not args.NoBrowser:
-                    return Monitor(gym.make('ChromeDinoRLPoTwoObstacles-v0'))
-                else:
-                    return Monitor(gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0'))
-            else:
-                raise Exception('Just 1 or 2 obstacles are supported')
+                    return Monitor(gym.make('ChromeDinoNotNormNoBrowser-v0'))
 
-        run = wandb.init(
-            project='dqn-features-sb',
-            entity="madog",
-            sync_tensorboard=True,
-            monitor_gym=True,
-            save_code=True,
-        )
 
-        model = DQN(
-            policy="MlpPolicy",
-            env=make_env(),
-            verbose=1,
-            learning_rate=LEARNING_RATE,
-            learning_starts=100,
-            batch_size=MINIBATCH_SIZE,
-            device='cpu'
-        )
-
-        model.learn(
-            total_timesteps=1000000,
-            n_eval_episodes=10,
-            log_interval=4,
-            callback=WandbCallback(
-                model_save_freq=100,
-                verbose=1,
-                gradient_save_freq=10,
-                model_save_path=f"models/rl/dqn_wo_img/features/{run.id}"
+            run = wandb.init(
+                project='dqn-images-sb',
+                entity="madog",
+                sync_tensorboard=True,
+                monitor_gym=True,
+                save_code=True,
             )
-        )
 
-        model.save(f"models/rl/dqn_sb/features/dqn_dino_{run.id}")
+            model = DQN(
+                policy="CnnPolicy",
+                env=make_env(),
+                verbose=1,
+                learning_rate=LEARNING_RATE,
+                learning_starts=100,
+                batch_size=MINIBATCH_SIZE,
+                device='cpu'
+            )
 
-        run.finish()
+            model.learn(
+                total_timesteps=1000000,
+                n_eval_episodes=10,
+                log_interval=4,
+                callback=WandbCallback(
+                    model_save_freq=100,
+                    verbose=1,
+                    gradient_save_freq=10,
+                    model_save_path=f"models/rl/dqn_wo_img/images/{run.id}"
+                )
+            )
 
+            model.save(f"models/rl/dqn_sb/images/dqn_dino_{run.id}")
+
+            run.finish()
+
+        else:
+
+            # TODO: Replace the route with the best model we got for Images DQN SB3
+
+            model = DQN.load("./models/rl/dqn_sb/features/dqn_dino_xk9hv8es.zip")
+
+            env = DummyVecEnv([lambda: gym.make('ChromeDinoRLPoTwoObstacles-v0')])
+            env.training = False
+
+            obs = env.reset()
+            while True:
+                action, _states = model.predict(obs, deterministic=True)
+                obs, reward, done, info = env.step(action)
+                if done:
+                    obs = env.reset()

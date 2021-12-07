@@ -19,50 +19,66 @@ class DQN(nn.Module):
         self.criterion = None
         self.model_path = model_path
 
-    def build_model(self, n_stacked_frames, n_actions, learning_rate):
+    def build_model(self, n_stacked_frames, n_actions, learning_rate, model_id=1):
 
-        # self.model = Sequential(OrderedDict([
-        #     ('conv_1', Conv2d(in_channels=n_stacked_frames, out_channels=32, kernel_size=(8, 8), padding=(122, 122),
-        #                       stride=(4, 4))),
-        #     ('pool_1', MaxPool2d(kernel_size=(2, 2))),
-        #     ('activation_1', ReLU()),
-        #     ('conv_2', Conv2d(in_channels=32, out_channels=64, kernel_size=(4, 4), padding=(21, 21), stride=(2, 2))),
-        #     ('pool_2', MaxPool2d(kernel_size=(2, 2))),
-        #     ('activation_2', ReLU()),
-        #     ('conv_3', Conv2d(in_channels=64, out_channels=64, kernel_size=(3, 3), padding=(1, 1), stride=(1, 1))),
-        #     ('pool_3', MaxPool2d(kernel_size=(2, 2))),
-        #     ('activation_3', ReLU()),
-        #     ('flatten', Flatten()),
-        #     ('linear_1', Linear(in_features=6400, out_features=512)),
-        #     ('activation_4', ReLU()),
-        #     ('linear_2', Linear(in_features=512, out_features=n_actions))
-        # ]))
+        if model_id == 1:
 
-        self.model = Sequential(OrderedDict([
-            ('conv_1', Conv2d(in_channels=n_stacked_frames, out_channels=16, kernel_size=(4, 4), stride=(4, 4))),
-            ('activation_1', ReLU()),
-            ('conv_2', Conv2d(in_channels=16, out_channels=32, kernel_size=(4, 4), stride=(2, 2))),
-            ('activation_2', ReLU()),
-            ('flatten', Flatten()),
-            ('linear_1', Linear(in_features=2592, out_features=256)),
-            ('activation_4', ReLU()),
-            ('linear_2', Linear(in_features=256, out_features=n_actions))
-        ]))
+            # Architecture proposed in https://arxiv.org/abs/1312.5602
 
-        # self.model = Sequential(OrderedDict([
-        #     ('conv_1', Conv2d(in_channels=n_stacked_frames, out_channels=16, kernel_size=(4, 4), stride=(2, 2),
-        #                       padding=(20, 20))),
-        #     ('pool_1', MaxPool2d(kernel_size=(2, 2), stride=(3,3))),
-        #     ('activation_1', ReLU()),
-        #     ('conv_2', Conv2d(in_channels=16, out_channels=32, kernel_size=(2, 2), stride=(2, 2))),
-        #     ('activation_2', ReLU()),
-        #     ('conv_3', Conv2d(in_channels=32, out_channels=64, kernel_size=(2, 2), stride=(2, 2))),
-        #     ('activation_3', ReLU()),
-        #     ('flatten', Flatten()),
-        #     ('linear_1', Linear(in_features=1600, out_features=256)),
-        #     ('activation_4', ReLU()),
-        #     ('linear_2', Linear(in_features=256, out_features=n_actions))
-        # ]))
+            self.model = Sequential(OrderedDict([
+                ('conv_1', Conv2d(in_channels=n_stacked_frames, out_channels=16, kernel_size=(4, 4), stride=(4, 4))),
+                ('activation_1', ReLU()),
+                ('conv_2', Conv2d(in_channels=16, out_channels=32, kernel_size=(4, 4), stride=(2, 2))),
+                ('activation_2', ReLU()),
+                ('flatten', Flatten()),
+                ('linear_1', Linear(in_features=2592, out_features=256)),
+                ('activation_4', ReLU()),
+                ('linear_2', Linear(in_features=256, out_features=n_actions))
+            ]))
+
+        elif model_id == 2:
+
+            # Architecture proposed in https://blog.paperspace.com/dino-run/
+
+            self.model = Sequential(OrderedDict([
+                ('conv_1', Conv2d(in_channels=n_stacked_frames, out_channels=32, kernel_size=(8, 8), padding=(122, 122),
+                                  stride=(4, 4))),
+                ('pool_1', MaxPool2d(kernel_size=(2, 2))),
+                ('activation_1', ReLU()),
+                ('conv_2', Conv2d(in_channels=32, out_channels=64, kernel_size=(4, 4), padding=(21, 21), stride=(2, 2))),
+                ('pool_2', MaxPool2d(kernel_size=(2, 2))),
+                ('activation_2', ReLU()),
+                ('conv_3', Conv2d(in_channels=64, out_channels=64, kernel_size=(3, 3), padding=(1, 1), stride=(1, 1))),
+                ('pool_3', MaxPool2d(kernel_size=(2, 2))),
+                ('activation_3', ReLU()),
+                ('flatten', Flatten()),
+                ('linear_1', Linear(in_features=6400, out_features=512)),
+                ('activation_4', ReLU()),
+                ('linear_2', Linear(in_features=512, out_features=n_actions))
+            ]))
+
+        elif model_id == 3:
+
+            # Architecture proposed by ourselves, aiming to reduce the number of parameters to learn
+
+            self.model = Sequential(OrderedDict([
+                ('conv_1', Conv2d(in_channels=n_stacked_frames, out_channels=16, kernel_size=(4, 4), stride=(2, 2),
+                                  padding=(20, 20))),
+                ('pool_1', MaxPool2d(kernel_size=(2, 2), stride=(3,3))),
+                ('activation_1', ReLU()),
+                ('conv_2', Conv2d(in_channels=16, out_channels=32, kernel_size=(2, 2), stride=(2, 2))),
+                ('activation_2', ReLU()),
+                ('conv_3', Conv2d(in_channels=32, out_channels=64, kernel_size=(2, 2), stride=(2, 2))),
+                ('activation_3', ReLU()),
+                ('flatten', Flatten()),
+                ('linear_1', Linear(in_features=1600, out_features=256)),
+                ('activation_4', ReLU()),
+                ('linear_2', Linear(in_features=256, out_features=n_actions))
+            ]))
+
+        else:
+
+            raise Exception('Model can only take as value: 1,2 or 3')
 
         self.optimizer = Adam(lr=learning_rate, params=self.model.parameters())
         self.criterion = MSELoss()

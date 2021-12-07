@@ -1,5 +1,4 @@
 from collections import OrderedDict
-from typing import Any
 
 import numpy as np
 import torch
@@ -12,21 +11,15 @@ class MLPTorch(nn.Module, NeuralNetwork):
     def __init__(self, input_size, hidden_size, output_size, p=0.1):
         super(MLPTorch, self).__init__()
         self.linear1 = nn.Linear(input_size, hidden_size)
-        # self.dropout = nn.Dropout(p=p)
         self.activation1 = nn.Sigmoid()
         self.linear2 = nn.Linear(hidden_size, output_size)
         self.activation2 = nn.Softmax(dim=0)
 
     def forward(self, x) -> torch.Tensor:
-        # print('1. ',x)
         output = self.linear1(x)
-        # print('2. ',output)
         output = self.activation1(output)
-        # print('3. ', output)
         output = self.linear2(output)
-        # print('4. ', output)
         output = self.activation2(output)
-        # print('5. ', output)
         return output
 
     def get_weights_biases(self) -> np.array:

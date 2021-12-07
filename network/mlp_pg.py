@@ -12,7 +12,6 @@ class MLPTorch(nn.Module, NeuralNetwork):
     def __init__(self, input_size, hidden_size, output_size, p=0.1):
         super(MLPTorch, self).__init__()
         self.linear1 = nn.Linear(input_size, hidden_size)
-        # self.dropout = nn.Dropout(p=p)
         self.activation1 = nn.Sigmoid()
         self.linear2 = nn.Linear(hidden_size, output_size)
         self.activation2 = nn.Softmax(dim=0)

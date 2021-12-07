@@ -1,0 +1,3 @@
+[submodule "gym_chrome_dino"]
+	path = gym_chrome_dino
+	url = https://github.com/nicosquare/gym-chrome-dino

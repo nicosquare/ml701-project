@@ -99,6 +99,8 @@ args = parser.parse_args()
 
 if __name__ == '__main__':
 
+    # TODO: Code the part to run the game in Observe mode
+
     # Guarantee the creation of required folders
     create_required_folders()
 
