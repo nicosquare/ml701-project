@@ -1,6 +1,7 @@
 import os
 import pickle
 import random
+import sys
 from pathlib import Path
 from collections import deque
 
@@ -344,9 +345,9 @@ if __name__ == '__main__':
 
                 if args.Obstacle is None or int(args.Obstacle) == 1:
                     if not args.NoBrowser:
-                        return Monitor(gym.make('ChromeDinoRLPoTwoObstacles-v0'))
+                        return Monitor(gym.make('ChromeDinoRLPo-v0'))
                     else:
-                        return Monitor(gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0'))
+                        return Monitor(gym.make('ChromeDinoRLPoNoBrowser-v0'))
                 elif int(args.Obstacle) == 2:
                     if not args.NoBrowser:
                         return Monitor(gym.make('ChromeDinoRLPoTwoObstacles-v0'))
@@ -391,17 +392,35 @@ if __name__ == '__main__':
 
         else:
 
-            # TODO: Replace the route with the best model we got for Features DQN SB3
+            # Check if we are running python 3.8+
+            # we need to patch saved model under python 3.6/3.7 to load them
+            newer_python_version = sys.version_info.major == 3 and sys.version_info.minor >= 8
 
-            model = DQN.load("./models/rl/dqn_sb/features/dqn_dino_xk9hv8es.zip")
+            custom_objects = {}
+            if newer_python_version:
+                custom_objects = {
+                    "learning_rate": 0.0,
+                    "lr_schedule": lambda _: 0.0,
+                    "clip_range": lambda _: 0.0,
+                }
+
+            model = DQN.load(path="./best_models/dino_dqn_features", custom_objects=custom_objects)
 
             env = DummyVecEnv([lambda: gym.make('ChromeDinoRLPoTwoObstacles-v0')])
             env.training = False
-
             obs = env.reset()
+
             while True:
-                action, _states = model.predict(obs, deterministic=True)
-                obs, reward, done, info = env.step(action)
-                if done:
-                    obs = env.reset()
+
+                try:
+
+                    action, _states = model.predict(obs, deterministic=True)
+                    obs, reward, done, info = env.step(action)
+                    if done:
+                        obs = env.reset()
+
+                except Exception as e:
+                    print('Closing environment due to exception')
+                    env.close()
+                    raise e
 

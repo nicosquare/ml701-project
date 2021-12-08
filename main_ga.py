@@ -91,15 +91,14 @@ parser.add_argument("-p", "--Population", help="key in number of population.")
 parser.add_argument("-g", "--Generation", help="key in max number of generation")
 parser.add_argument("-m", "--Mutation", help="key in mutation rate")
 parser.add_argument("-c", "--Crossover", help="key in crossover rate")
-parser.add_argument("-o", "--Obstacle", help="number of obstacles to include")
+parser.add_argument("-obs", "--Obstacle", help="number of obstacles to include")
+parser.add_argument("-o", "--Observe", help="If used, no training is done, just playing", action='store_true')
 parser.add_argument("-n", "--NoBrowser", help="run without UI", action='store_true')
 
 # Read arguments from command line
 args = parser.parse_args()
 
 if __name__ == '__main__':
-
-    # TODO: Code the part to run the game in Observe mode
 
     # Guarantee the creation of required folders
     create_required_folders()
@@ -123,13 +122,42 @@ if __name__ == '__main__':
     MAX_GENERATION = int(args.Generation) if args.Generation else 10
     MUTATION_RATE = float(args.Mutation) if args.Mutation else 0.1
     CROSSOVER_RATE = float(args.Crossover) if args.Crossover else 0.8
+    OBSERVE = args.Observe
 
-    p = Population(lambda: MLPIndividual(len(env.reset()), 10, 3), POPULATION_SIZE, MAX_GENERATION,
-                   MUTATION_RATE, CROSSOVER_RATE, None)
+    if not OBSERVE:
 
-    try:
-        p.run(env, generation, verbose=True, output_folder='./models/ga/dino', log=True)
-    except Exception as e:
-        print('Closing environment due to exception')
-        env.close()
-        raise e
+        p = Population(lambda: MLPIndividual(len(env.reset()), 10, 3), POPULATION_SIZE, MAX_GENERATION,
+                       MUTATION_RATE, CROSSOVER_RATE, None)
+
+        try:
+            p.run(env, generation, verbose=True, output_folder='./models/ga/dino', log=True)
+        except Exception as e:
+            print('Closing environment due to exception')
+            env.close()
+            raise e
+
+    else:
+
+        weight_biases = np.load('best_models/dino_ga.npy')
+        model = MLPTorch(len(env.reset()), 10, 3)
+        model.update_weights_biases(weights_biases=weight_biases)
+        model.eval()
+
+        env.training = False
+        obs = env.reset()
+
+        while True:
+
+            try:
+
+                obs = torch.from_numpy(obs).float()
+                action = model.forward(obs)
+                obs, reward, done, _ = env.step(torch.argmax(action))
+
+                if done:
+                    obs = env.reset()
+
+            except Exception as e:
+                print('Closing environment due to exception')
+                env.close()
+                raise e

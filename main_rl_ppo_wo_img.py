@@ -1,3 +1,5 @@
+import sys
+
 import gym
 import gym_chrome_dino  # This should be kept as it is registering the custom environments
 import argparse
@@ -27,7 +29,7 @@ if __name__ == '__main__':
 
     OBSERVE = args.Observe
 
-    if OBSERVE:
+    if not OBSERVE:
 
         # wandb.login(key='837737e201bd4bc505eca74b5406b0cb7a602db5')
         config = {
@@ -61,15 +63,34 @@ if __name__ == '__main__':
 
     else:
 
-        # TODO: Replace the route with the best model we got for Features PPO SB3
-        model = PPO.load("./models/2od58sa7/model")
+        # Check if we are running python 3.8+
+        # we need to patch saved model under python 3.6/3.7 to load them
+        newer_python_version = sys.version_info.major == 3 and sys.version_info.minor >= 8
+
+        custom_objects = {}
+        if newer_python_version:
+            custom_objects = {
+                "learning_rate": 0.0,
+                "lr_schedule": lambda _: 0.0,
+                "clip_range": lambda _: 0.0,
+            }
+
+        model = PPO.load(path="./best_models/dino_ppo", custom_objects=custom_objects)
 
         env = DummyVecEnv([lambda: gym.make('ChromeDinoRLPo-v0')])
         env.training = False
-
         obs = env.reset()
+
         while True:
-            action, _states = model.predict(obs, deterministic=True)
-            obs, reward, done, info = env.step(action)
-            if done:
-                obs = env.reset()
+
+            try:
+
+                action, _states = model.predict(obs, deterministic=True)
+                obs, reward, done, info = env.step(action)
+                if done:
+                    obs = env.reset()
+
+            except Exception as e:
+                print('Closing environment due to exception')
+                env.close()
+                raise e
