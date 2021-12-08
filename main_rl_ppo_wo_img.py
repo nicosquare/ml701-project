@@ -31,7 +31,6 @@ if __name__ == '__main__':
 
     if not OBSERVE:
 
-        # wandb.login(key='837737e201bd4bc505eca74b5406b0cb7a602db5')
         config = {
             "policy_type": "MlpPolicy",
             "total_timesteps": 100000,
