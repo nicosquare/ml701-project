@@ -7,6 +7,7 @@ import torch
 import gym_chrome_dino
 from typing import Tuple
 import numpy as np
+import pandas as pd
 import argparse
 
 from ga.individual import roulette_wheel_selection, crossover, mutation, Individual
@@ -138,6 +139,8 @@ if __name__ == '__main__':
 
     else:
 
+        score_df = pd.DataFrame(columns=['score'])
+
         weight_biases = np.load('best_models/dino_ga.npy')
         model = MLPTorch(len(env.reset()), 10, 3)
         model.update_weights_biases(weights_biases=weight_biases)
@@ -146,18 +149,29 @@ if __name__ == '__main__':
         env.training = False
         obs = env.reset()
 
-        while True:
+        for i in range(100):
 
-            try:
+            done = False
 
-                obs = torch.from_numpy(obs).float()
-                action = model.forward(obs)
-                obs, reward, done, _ = env.step(torch.argmax(action))
+            print(f'Rollout {i}')
 
-                if done:
-                    obs = env.reset()
+            while done is not True:
 
-            except Exception as e:
-                print('Closing environment due to exception')
-                env.close()
-                raise e
+                try:
+
+                    obs = torch.from_numpy(obs).float()
+                    action = model.forward(obs)
+                    obs, reward, done, _ = env.step(torch.argmax(action))
+
+                    if done:
+                        obs = env.reset()
+
+                except Exception as e:
+                    print('Closing environment due to exception')
+                    env.close()
+                    raise e
+
+            score_df.loc[len(score_df)] = reward
+
+        score_df.to_csv(path_or_buf='models/eval_ga.csv', index=False)
+        env.close()

@@ -3,15 +3,12 @@ import sys
 import gym
 import gym_chrome_dino  # This should be kept as it is registering the custom environments
 import argparse
+import pandas as pd
 import wandb
 from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 from wandb.integration.sb3 import WandbCallback
-
-
-def make_env():
-    return Monitor(gym.make(config["env_name"]))
 
 
 """
@@ -21,11 +18,27 @@ def make_env():
 parser = argparse.ArgumentParser()
 
 parser.add_argument("-o", "--Observe", help="If used, no training is done, just playing", action='store_true')
+parser.add_argument("-n", "--NoBrowser", help="run without UI", action='store_true')
 
 # Read arguments from command line
 args = parser.parse_args()
 
 if __name__ == '__main__':
+
+    def make_env():
+
+        if args.Obstacle is None or int(args.Obstacle) == 1:
+            if not args.NoBrowser:
+                return Monitor(gym.make('ChromeDinoRLPo-v0'))
+            else:
+                return Monitor(gym.make('ChromeDinoRLPoNoBrowser-v0'))
+        elif int(args.Obstacle) == 2:
+            if not args.NoBrowser:
+                return Monitor(gym.make('ChromeDinoRLPoTwoObstacles-v0'))
+            else:
+                return Monitor(gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0'))
+        else:
+            raise Exception('Just 1 or 2 obstacles are supported')
 
     OBSERVE = args.Observe
 
@@ -62,6 +75,8 @@ if __name__ == '__main__':
 
     else:
 
+        score_df = pd.DataFrame(columns=['score'])
+
         # Check if we are running python 3.8+
         # we need to patch saved model under python 3.6/3.7 to load them
         newer_python_version = sys.version_info.major == 3 and sys.version_info.minor >= 8
@@ -76,20 +91,32 @@ if __name__ == '__main__':
 
         model = PPO.load(path="./best_models/dino_ppo", custom_objects=custom_objects)
 
-        env = DummyVecEnv([lambda: gym.make('ChromeDinoRLPo-v0')])
+        env = DummyVecEnv([lambda: make_env()])
         env.training = False
         obs = env.reset()
 
-        while True:
+        for i in range(100):
 
-            try:
+            print(f'Rollout {i}')
 
-                action, _states = model.predict(obs, deterministic=True)
-                obs, reward, done, info = env.step(action)
-                if done:
-                    obs = env.reset()
+            done = False
 
-            except Exception as e:
-                print('Closing environment due to exception')
-                env.close()
-                raise e
+            while done is not True:
+
+                try:
+
+                    action, _states = model.predict(obs, deterministic=True)
+                    obs, reward, done, info = env.step(action)
+
+                    if done:
+                        obs = env.reset()
+
+                except Exception as e:
+                    print('Closing environment due to exception')
+                    env.close()
+                    raise e
+
+            score_df.loc[len(score_df)] = info['score']
+
+        score_df.to_csv(path_or_buf='models/eval_ppo_wo_img.csv', index=False)
+        env.close()

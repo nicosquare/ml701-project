@@ -339,22 +339,22 @@ if __name__ == '__main__':
 
     else:
 
-        if not OBSERVE:
+        def make_env():
 
-            def make_env():
-
-                if args.Obstacle is None or int(args.Obstacle) == 1:
-                    if not args.NoBrowser:
-                        return Monitor(gym.make('ChromeDinoRLPo-v0'))
-                    else:
-                        return Monitor(gym.make('ChromeDinoRLPoNoBrowser-v0'))
-                elif int(args.Obstacle) == 2:
-                    if not args.NoBrowser:
-                        return Monitor(gym.make('ChromeDinoRLPoTwoObstacles-v0'))
-                    else:
-                        return Monitor(gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0'))
+            if args.Obstacle is None or int(args.Obstacle) == 1:
+                if not args.NoBrowser:
+                    return Monitor(gym.make('ChromeDinoRLPo-v0'))
                 else:
-                    raise Exception('Just 1 or 2 obstacles are supported')
+                    return Monitor(gym.make('ChromeDinoRLPoNoBrowser-v0'))
+            elif int(args.Obstacle) == 2:
+                if not args.NoBrowser:
+                    return Monitor(gym.make('ChromeDinoRLPoTwoObstacles-v0'))
+                else:
+                    return Monitor(gym.make('ChromeDinoRLPoTwoObstaclesNoBrowser-v0'))
+            else:
+                raise Exception('Just 1 or 2 obstacles are supported')
+
+        if not OBSERVE:
 
             run = wandb.init(
                 project='dqn-features-sb',
@@ -392,6 +392,8 @@ if __name__ == '__main__':
 
         else:
 
+            score_df = pd.DataFrame(columns=['score'])
+
             # Check if we are running python 3.8+
             # we need to patch saved model under python 3.6/3.7 to load them
             newer_python_version = sys.version_info.major == 3 and sys.version_info.minor >= 8
@@ -406,21 +408,32 @@ if __name__ == '__main__':
 
             model = DQN.load(path="./best_models/dino_dqn_features", custom_objects=custom_objects)
 
-            env = DummyVecEnv([lambda: gym.make('ChromeDinoRLPoTwoObstacles-v0')])
+            env = DummyVecEnv([lambda: make_env()])
             env.training = False
             obs = env.reset()
 
-            while True:
+            for i in range(100):
 
-                try:
+                done = False
 
-                    action, _states = model.predict(obs, deterministic=True)
-                    obs, reward, done, info = env.step(action)
-                    if done:
-                        obs = env.reset()
+                print(f'Rollout {i}')
 
-                except Exception as e:
-                    print('Closing environment due to exception')
-                    env.close()
-                    raise e
+                while done is not True:
 
+                    try:
+
+                        action, _states = model.predict(obs, deterministic=True)
+                        obs, reward, done, info = env.step(action)
+
+                        if done:
+                            obs = env.reset()
+
+                    except Exception as e:
+                        print('Closing environment due to exception')
+                        env.close()
+                        raise e
+
+                score_df.loc[len(score_df)] = info['score']
+
+            score_df.to_csv(path_or_buf='models/eval_dqn_sb_wo_img.csv', index=False)
+            env.close()
