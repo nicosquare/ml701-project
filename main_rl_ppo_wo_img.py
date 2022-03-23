@@ -108,7 +108,8 @@ if __name__ == '__main__':
                     action, _states = model.predict(obs, deterministic=True)
                     obs, reward, done, info = env.step(action)
 
-                    if done:
+                    if done\
+                            :
                         obs = env.reset()
 
                 except Exception as e:
